@@ -1,6 +1,4 @@
-<<<<<<< HEAD
 venv/
-=======
 # Prerequisites
 *.d
 
@@ -53,4 +51,3 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
->>>>>>> 7896b9c18b53dd403f55b8065b03f8cc6f08af74
