@@ -1,13 +1,13 @@
 CC=gcc
 LIB=lhdf5_serial
 CFLAGS=-I /usr/include/hdf5/serial -std=c99 -g
-OBJ=main.o
-NAME=cnn.out
+OBJ=main.o utils/utils.o
+NAME=main
 
 all: $(NAME)
 
-matmul: $(OBJ)
-	$(CC) -o $@ $(OBJ) $(CFLAGS) -l $(LIB)
+main: $(OBJ)
+	$(CC) -o $@ $(OBJ) $(CFLAGS) #-l $(LIB)
 %.o: %.c #$(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 clean:
