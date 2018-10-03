@@ -30,10 +30,11 @@ int main( int argc, char * argv[]){
 
     char* dataset = read_images("../datasets/test_batch.bin");
     resnet_t* resnet = build_resnet(3, "../test/");
-    int n = 50;
+    int n = 1;
     float acc = infer_resnet(resnet, dataset, n);
     printf("%.4f accuracy on %d images\n", acc, n);
-
+    free_resnet(resnet);
+    free(dataset);
     // char* image_10 = get_image(1, dataset);
     // printf("%hhx\n", image_10[0]);
     // conv_t * conv = read_conv("../test/conv_1.bin");
