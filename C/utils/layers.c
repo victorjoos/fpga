@@ -60,7 +60,7 @@ fm_t* avg_pool(fm_t* fm_in){
             acc += *channel;
             ++channel;
         }
-        set_fm_elem(fm_out, acc, n, 0, 0);
+        set_fm_elem(fm_out, acc/(float)fm_in->fsize, n, 0, 0);
     }
     return fm_out;
 }
