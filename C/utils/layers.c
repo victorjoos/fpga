@@ -22,7 +22,7 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides){
                     for(int k=0; k<conv->xsize; ++k){
                         for(int l=0; l<conv->xsize; ++l){
                             acc += get_conv_elem(conv, k, l, inf, outf)*
-                                get_fm_elem(fm_in, inf, i, j);
+                                get_fm_elem(fm_in, inf, i+k, j+l);
                         }
                     }
                 }
