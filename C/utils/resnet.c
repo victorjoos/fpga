@@ -50,7 +50,8 @@ double infer_resnet(resnet_t* resnet, char* imgs, int n_imgs){
         // TODO: free memory correctly
         
         // First non-residual block
-        fm = convolve(resnet->convs, fm, 1);
+        fm_t* fm_prev = fm;
+        fm = convolve(resnet->convs, fm, 1); free_fm(fm_prev);
         fm = normalize(resnet->bns, fm);
         fm = activate(fm, RELU);
         fm_t* fm_shortcut = fm;
@@ -60,7 +61,7 @@ double infer_resnet(resnet_t* resnet, char* imgs, int n_imgs){
         int short_conv_index = 0;
         // Loop over the 3 stacks, each containing nblocks
         for(int st=0; st<n_stacks; ++st){
-            printf("stack %d\n", st);
+            printf("----stack %d\n", st);
             // Loop over the blocks
             for(int bl=0; bl<resnet->nblocks; ++bl){
                 printf("block %d\n", bl);
@@ -82,7 +83,7 @@ double infer_resnet(resnet_t* resnet, char* imgs, int n_imgs){
                 }
 
                 // Addition with shortcut
-                fm = add(fm, fm_shortcut);
+                fm = add(fm, fm_shortcut); free_fm(fm_shortcut);
                 fm = divide(fm);
                 fm = activate(fm, RELU);
 
@@ -91,8 +92,9 @@ double infer_resnet(resnet_t* resnet, char* imgs, int n_imgs){
                              
             }
         }
-        fm = avg_pool(fm);
-        fm = connect(resnet->denses, fm);
+        fm_prev = fm;
+        fm = avg_pool(fm); free_fm(fm_prev); fm_prev = fm;
+        fm = connect(resnet->denses, fm); free_fm(fm_prev);
         float maxval = fm->values[0];
         char maxi = 0;
         for(int i=1; i<10; ++i){
@@ -102,6 +104,7 @@ double infer_resnet(resnet_t* resnet, char* imgs, int n_imgs){
                 maxi = (char) i;
             }
         }
+        free_fm(fm);
         printf("Expected %d and got %d\n", img_class, maxi);
         ok += (maxi==img_class);
     }

@@ -27,7 +27,7 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides){
                     }
                 }
                 acc += conv->bias[outf];
-                set_fm_elem(fm_out, acc, outf, _i, _j);
+                set_fm_elem(fm_out, acc, outf, _i/strides, _j/strides);
             }
         }
     }
