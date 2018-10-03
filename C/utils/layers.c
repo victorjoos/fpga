@@ -4,12 +4,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-
+#include <assert.h>
 
 
 
 
 fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides){
+    assert(conv->size_in == fm_in->nchannels);
     fm_t* fm_out = alloc_fm(conv->size_out, fm_in->fdim/strides);
     const int offset = conv->xsize/2;
     for(int outf=0; outf<conv->size_out; ++outf){
@@ -33,6 +34,7 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides){
     return fm_out;
 }
 fm_t* connect(dense_t* dense, fm_t* fm_in){
+    assert(dense->size_in == fm_in->nchannels);
     fm_t* fm_out = alloc_fm(dense->size_out, 1);
     for(int outf=0; outf<dense->size_out; ++outf){
         for(int i=0; i<fm_in->fdim; ++i){
@@ -82,12 +84,15 @@ fm_t* divide(fm_t* fm_in){
     return apply_f(fm_in, __div);
 }
 fm_t* add(fm_t* fm_in1, fm_t* fm_in2){
+    assert(fm_in1->nchannels == fm_in2->nchannels);
+    assert(fm_in1->fdim == fm_in2->fdim);
     const int size = fm_in1->nchannels*fm_in1->fsize;
     for(int i=0; i<size; ++i)
         fm_in1->values[i] += fm_in2->values[i];
     return fm_in1;
 }
 fm_t* normalize(bn_t* bn, fm_t* fm_in){
+    assert(bn->size == fm_in->nchannels);
     float* values = fm_in->values;
     const float epsilon = 1e-3f;
     for(int n=0; n<fm_in->nchannels; ++n){

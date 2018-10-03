@@ -108,7 +108,7 @@ float get_dense_elem(dense_t * dense, int i, int j){
     return dense->kernel[i*dense->size_out + j];
 }
 float get_fm_elem(fm_t* fm, int channel, int i, int j){
-    if((i<0)|(j<0)|(i>=fm->fdim)|(j>=fm->fdim)) return 0;
+    if((i<0)||(j<0)||(i>=fm->fdim)||(j>=fm->fdim)) return 0;
     return fm->values[channel*fm->fsize + i*fm->fdim + j];
 }
 void set_fm_elem(fm_t* fm, float value, int channel, int i, int j){

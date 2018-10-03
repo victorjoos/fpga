@@ -6,6 +6,7 @@
 // #include <hdf5.h>
 #include "utils/utils.h"
 #include "utils/layers.h"
+#include "utils/resnet.h"
 
 void print_usage(){
     printf("Usage: ./main -d <directory> -s <resnet-size>\n");
@@ -28,11 +29,16 @@ int main( int argc, char * argv[]){
     */
 
     char* dataset = read_images("../datasets/test_batch.bin");
-    char* image_10 = get_image(1, dataset);
-    printf("%hhx\n", image_10[0]);
-    conv_t * conv = read_conv("../test/conv_1.bin");
-    bn_t* bn = read_bn("../test/bn_1.bin");
-    fm_t * fm = activate(normalize(bn, convolve(conv, img_to_fm(image_10), 1)), RELU);
+    resnet_t* resnet = build_resnet(3, "../test/");
+    int n = 1;
+    float acc = infer_resnet(resnet, dataset, n);
+    printf("%.4f accuracy on %d images\n", acc, n);
+
+    // char* image_10 = get_image(1, dataset);
+    // printf("%hhx\n", image_10[0]);
+    // conv_t * conv = read_conv("../test/conv_1.bin");
+    // bn_t* bn = read_bn("../test/bn_1.bin");
+    // fm_t * fm = activate(normalize(bn, convolve(conv, img_to_fm(image_10), 1)), RELU);
     // dense_t * dense = read_dense("../test/dense_1.bin");
     // bn_t * bn = read_bn("../test/bn_1.bin");
     return 0;

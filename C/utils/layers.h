@@ -3,6 +3,13 @@
 #include "utils.h"
 #include "activations.h"
 
+// typedef enum layer {CONV, DENSE, AVG_POOL, BN, ACT, DIV, ADD} layer_type_t;
+// typedef struct layer{
+//     layer_type_t type;
+//     void* layer;
+// } layer_t;
+
+
 fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides);
 fm_t* connect(dense_t* dense, fm_t* fm_in);
 fm_t* avg_pool(fm_t* fm_in);
