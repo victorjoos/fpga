@@ -9,6 +9,7 @@ class Bn():
         self.gamma = data["gamma:0"]
         self.mean = data["moving_mean:0"]
         self.var = data["moving_variance:0"]
+        print(self.beta.shape[0])
         self.sizes = np.array([self.beta.shape[0]]).astype(np.int32).tobytes()
         self.all = [self.beta, self.gamma, self.mean, self.var]
 class Conv():
@@ -28,7 +29,7 @@ class Conv():
 class Dense():
     def __init__(self, data):
         self.kernel = np.array(data["kernel:0"])
-        print(self.kernel[17][6])
+        print(self.kernel.shape)
         self.bias = data["bias:0"]
         self.size_in = self.kernel.shape[0]
         self.size_out = self.kernel.shape[1]

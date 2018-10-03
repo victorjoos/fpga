@@ -1,16 +1,39 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <ctype.h>
+#include <getopt.h>
 // #include <hdf5.h>
 #include "utils/utils.h"
+#include "utils/layers.h"
 
+void print_usage(){
+    printf("Usage: ./main -d <directory> -s <resnet-size>\n");
+}
 
-int main(){
+int main( int argc, char * argv[]){
+    /* Uncomment once code is ready
+    int option = 0;
+    char * dir = NULL;
+    int nres = 0;
+    while( (option = getopt(argc, argv, "d:s:")) != -1 ){
+        switch(option){
+            case 'd': dir = optarg; break;
+            case 's': nres = atoi(optarg); break;
+            default : printf("%d\n", option); print_usage(); exit(EXIT_FAILURE);
+        }
+    }
+    if(dir == NULL | nres == 0) { print_usage(); exit(EXIT_FAILURE); }
+    printf("%s %d\n", dir, nres);
+    */
+
     char* dataset = read_images("../datasets/test_batch.bin");
     char* image_10 = get_image(1, dataset);
     printf("%hhx\n", image_10[0]);
-
     conv_t * conv = read_conv("../test/conv_1.bin");
-    dense_t * dense = read_dense("../test/dense_1.bin");
-    bn_t * bn = read_bn("../test/bn_1.bin");
+    bn_t* bn = read_bn("../test/bn_1.bin");
+    fm_t * fm = activate(normalize(bn, convolve(conv, img_to_fm(image_10), 1)), RELU);
+    // dense_t * dense = read_dense("../test/dense_1.bin");
+    // bn_t * bn = read_bn("../test/bn_1.bin");
     return 0;
 }

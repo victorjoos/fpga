@@ -12,7 +12,7 @@ typedef enum layer {CONV, BN, DENSE} layer_t;
 typedef struct conv {
     float * kernel;
     float * bias;
-    int strides;
+    int xsize;
     int size_in;
     int size_out;
 } conv_t;
@@ -31,11 +31,29 @@ typedef struct bn {
     float * var;
     int size;
 } bn_t;
+typedef struct feature_map{
+    float * values;
+    int nchannels;
+    int fdim;
+    int fsize; //= fdim*fdim
+} fm_t;
+
+
 
 conv_t * read_conv(char* filename);
 dense_t * read_dense(char* filename);
 bn_t * read_bn(char* filename);
+fm_t* alloc_fm(int nchannels, int fdim);
+fm_t* img_to_fm(char* img);
+
+
+void free_conv(conv_t* conv);
+void free_dense(dense_t* dense);
+void free_bn(bn_t* bn);
+void free_fm(fm_t* fm);
 
 float get_conv_elem(conv_t* conv, int i, int j, int k, int l);
 float get_dense_elem(dense_t* dense, int i, int j);
+float get_fm_elem(fm_t* fm, int channel, int i, int j);
+void set_fm_elem(fm_t* fm, float value, int channel, int i, int j);
 #endif
