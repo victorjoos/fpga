@@ -3,6 +3,7 @@ import os
 import h5py 
 import struct
 import numpy as np
+import re
 class Bn():
     def __init__(self, data):
         self.beta = data["beta:0"]
@@ -76,9 +77,7 @@ def main(file):
     params = h5py.File(file, 'r')
     params = params["model_weights"]
 
-    bn_counter = 1
-    conv_counter = 1
-    dense_counter = 1
+
     for x in params:
         group = params[x]
         print("-----")
@@ -86,14 +85,14 @@ def main(file):
         for y in group:
             print(y)
             if "batch_normalization" in y:
-                write_bn(d, bn_counter, group[y])
-                bn_counter += 1
+                match = re.match(r'batch_normalization_(\d*)', y)
+                write_bn(d, int(match.groups()[0]), group[y])
             elif "conv2d" in y:
-                write_conv(d, conv_counter, group[y])
-                conv_counter += 1
+                match = re.match(r'conv2d_(\d*)', y)
+                write_conv(d, int(match.groups()[0]), group[y])
             elif "dense" in y:
-                write_dense(d, dense_counter, group[y])
-                dense_counter += 1
+                match = re.match(r'dense_(\d*)', y)
+                write_dense(d, int(match.groups()[0]), group[y])
 
 
 if __name__ == "__main__":
