@@ -61,6 +61,7 @@ double infer_resnet(resnet_t* resnet, char* imgs, int n_imgs){
         // First non-residual block
         fm_t* fm_prev = fm;
         fm = convolve(resnet->convs[0], fm, 1); free_fm(fm_prev);
+        print_fm(fm, 0);
         fm = normalize(resnet->bns[0], fm);
         fm = activate(fm, RELU);
         fm_t* fm_shortcut = fm;

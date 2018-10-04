@@ -12,7 +12,7 @@ conv_t* alloc_conv(int xsize, int size_in, int size_out){
     conv->bias = values + kernel_size;
     return conv;
 }
-void print_fm(fm_t* fm){
+void print_fm_test(fm_t* fm){
     for(int n=0; n<fm->nchannels; n++){
         printf("----Channel %d\n", n);
         for(int i=0; i<fm->fdim; ++i){
@@ -49,12 +49,12 @@ void simple_convolve(){
 
     // Test w/ strides = 1
     fm2 = convolve(conv, fm, 1); 
-    print_fm(fm2); // todo everything = 6
+    print_fm_test(fm2); // todo everything = 6
     free_fm(fm2);
     
     // Test w/ strides = 2
     fm2 = convolve(conv, fm, 2);
-    print_fm(fm2); // todo everything = 6
+    print_fm_test(fm2); // todo everything = 6
     free_fm(fm2);
 
 
@@ -71,12 +71,12 @@ void simple_convolve(){
     }
     // Test w/ strides = 1
     fm2 = convolve(conv, fm, 1); 
-    print_fm(fm2); // todo everything = 6
+    print_fm_test(fm2); // todo everything = 6
     free_fm(fm2);
     
     // Test w/ strides = 2
     fm2 = convolve(conv, fm, 2);
-    print_fm(fm2); // todo everything = 6
+    print_fm_test(fm2); // todo everything = 6
     free_fm(fm2);
 
 
@@ -84,9 +84,27 @@ void simple_convolve(){
     free_fm(fm);
 }
 
+void random_convolution() {
+    conv_t* conv = alloc_conv(3, 5, 2);
+    for (int i=0; i<3*3*5*2; i++) {
+        // set_conv_elem(conv, i, )
+        conv->kernel[i] = i;
+    }
+    conv->bias[0] = 0;
+    conv->bias[1] = 0;
+
+    fm_t* fm = alloc_fm(2, 6); fm_t* fm2;
+    for (int i=0; i<5*6*6; i++) {
+        fm->values[i] = 1;
+    }
+    fm2 = convolve(conv, fm, 1);
+    print_fm_test(fm2);
+}
+
 void test_convolve(){
     
-    simple_convolve();
+    //simple_convolve();
+    random_convolution();
 }
 
 void test_connect(){
