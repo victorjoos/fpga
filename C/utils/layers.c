@@ -17,7 +17,7 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides){
         for(int _i=0; _i<fm_in->fdim; _i+=strides){
             for(int _j=0; _j<fm_in->fdim; _j+=strides){
                 int i = _i-offset; int j = _j-offset;
-                float acc = 0;
+                float acc = 0.0f;
                 for(int inf=0; inf<conv->size_in; ++inf){
                     for(int k=0; k<conv->xsize; ++k){
                         for(int l=0; l<conv->xsize; ++l){

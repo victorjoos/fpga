@@ -1,13 +1,17 @@
 CC=gcc
 LIB= m# lhdf5_serial
 CFLAGS= -std=c99 -g -Wall -I . #/usr/include/hdf5/serial 
-OBJ=main.o utils/utils.o utils/layers.o utils/activations.o utils/resnet.o
+MAINOBJ=main.o
+OBJ=utils/utils.o utils/layers.o utils/activations.o utils/resnet.o
+TESTOBJ=test.o tests/layers.o
 NAME=main
 
 all: $(NAME)
 
-main: $(OBJ)
-	$(CC) -o $@ $(OBJ) $(CFLAGS) -l $(LIB)
+main: $(MAINOBJ) $(OBJ)
+	$(CC) -o $@ $(MAINOBJ) $(OBJ) $(CFLAGS) -l $(LIB)
+test: $(OBJ) $(TESTOBJ)
+	$(CC) -o $@ $(TESTOBJ) $(OBJ) $(CFLAGS) -l $(LIB)
 %.o: %.c #$(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 clean:

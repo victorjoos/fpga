@@ -55,5 +55,6 @@ dkms.conf
 # python
 *.pyc
 
-#executable
+# executables
 main
+test

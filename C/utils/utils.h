@@ -52,7 +52,8 @@ void free_dense(dense_t* dense);
 void free_bn(bn_t* bn);
 void free_fm(fm_t* fm);
 
-float get_conv_elem(conv_t* conv, int i, int j, int k, int l);
+float get_conv_elem(conv_t* conv, int k, int l, int inf, int outf);
+void set_conv_elem(conv_t* conv, float value, int k, int l, int inf, int outf);
 float get_dense_elem(dense_t* dense, int i, int j);
 float get_fm_elem(fm_t* fm, int channel, int i, int j);
 void set_fm_elem(fm_t* fm, float value, int channel, int i, int j);

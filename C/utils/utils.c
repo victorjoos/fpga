@@ -97,11 +97,17 @@ fm_t* alloc_fm(int nchannels, int fdim){
 
 
 // wrappers for matrices
-float get_conv_elem(conv_t* conv, int i, int j, int k, int l){
+float get_conv_elem(conv_t* conv, int k, int l, int inf, int outf){
     int zsize = conv->size_out;
     int ysize = zsize*conv->size_in;
     int xsize = ysize*conv->xsize;
-    return conv->kernel[i*xsize + j*ysize + k*zsize + l];
+    return conv->kernel[k*xsize + l*ysize + inf*zsize + outf];
+}
+void set_conv_elem(conv_t* conv, float value, int k, int l, int inf, int outf){
+    int zsize = conv->size_out;
+    int ysize = zsize*conv->size_in;
+    int xsize = ysize*conv->xsize;
+    conv->kernel[k*xsize + l*ysize + inf*zsize + outf] = value;
 }
 
 float get_dense_elem(dense_t * dense, int i, int j){

@@ -70,10 +70,8 @@ double infer_resnet(resnet_t* resnet, char* imgs, int n_imgs){
         int short_conv_index = 0;
         // Loop over the 3 stacks, each containing nblocks
         for(int st=0; st<n_stacks; ++st){
-            printf("----stack %d\n", st);
             // Loop over the blocks
             for(int bl=0; bl<resnet->nblocks; ++bl){
-                printf("block %d\n", bl);
                 // Main block C->BN->Act->C->BN
                 int strides = (st>0 && bl==0)? 2: 1;
                 fm = convolve(resnet->convs[conv_index], fm, strides); ++conv_index;
@@ -109,8 +107,9 @@ double infer_resnet(resnet_t* resnet, char* imgs, int n_imgs){
         fm = connect(resnet->denses[0], fm); free_fm(fm_prev);
         float maxval = fm->values[0];
         char maxi = 0;
-        for(int i=1; i<10; ++i){
+        for(int i=0; i<10; ++i){
             float fmv = fm->values[i];
+            printf("%f\n", fmv);
             if(maxval<fmv){
                 maxval = fmv;
                 maxi = (char) i;
