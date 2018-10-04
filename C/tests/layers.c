@@ -93,9 +93,9 @@ void random_convolution() {
     conv->bias[0] = 0;
     conv->bias[1] = 0;
 
-    fm_t* fm = alloc_fm(2, 6); fm_t* fm2;
+    fm_t* fm = alloc_fm(5, 6); fm_t* fm2;
     for (int i=0; i<5*6*6; i++) {
-        fm->values[i] = 1;
+        fm->values[i] = i;
     }
     fm2 = convolve(conv, fm, 1);
     print_fm_test(fm2);

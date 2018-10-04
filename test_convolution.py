@@ -10,6 +10,6 @@ model = Sequential()
 model.add(Conv2D(2, kernel_size=3, strides=1, input_shape=(6,6,5),
 padding='same', use_bias=False))
 model.set_weights(w)
-score = model.predict(np.ones((1,6,6,5)))
+score = model.predict([np.arange(1*6*6*5).reshape(1,6,6,5)])
 
-print(score[0])
+print(score)
