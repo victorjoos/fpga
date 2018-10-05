@@ -28,7 +28,7 @@ int main( int argc, char * argv[]){
     printf("%s %d\n", dir, nres);
     */
 
-    char* dataset = read_images("../datasets/test_batch.bin");
+    unsigned char* dataset = read_images("../datasets/test_batch.bin");
     resnet_t* resnet = build_resnet(3, "../test/");
     int n = 1;
     float acc = infer_resnet(resnet, dataset, n);

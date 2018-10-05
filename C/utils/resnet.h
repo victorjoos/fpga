@@ -11,5 +11,5 @@ typedef struct resnet {
 resnet_t* build_resnet(int nblocks, char* dir);
 void free_resnet(resnet_t* resnet);
 // returns the accuracy on the first img_sizes
-double infer_resnet(resnet_t* resnet, char* imgs, int n_imgs);
+double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs);
 #endif

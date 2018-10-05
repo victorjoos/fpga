@@ -3,11 +3,11 @@
 #include "utils.h"
 
 const int IMSIZE = IMDIM*IMDIM*IMCHANNEL;
-char* read_images(char* filename) {
+unsigned char* read_images(char* filename) {
     FILE *fileptr = fopen(filename, "rb");
     size_t filelen = (IMSIZE + 1) * 10000; // image size + label
-    char* buffer = (char*) malloc(filelen * sizeof(char));
-    fread(buffer, sizeof(char), filelen, fileptr);
+    unsigned char* buffer = (unsigned char*) malloc(filelen * sizeof(unsigned char));
+    fread(buffer, sizeof(unsigned char), filelen, fileptr);
     fclose(fileptr);
     return buffer;
 }
@@ -16,13 +16,19 @@ char* read_images(char* filename) {
 * - number: an image between 0 and 999
 * - dataset : an array obtained from read_images
 */
-char* get_image(int number, char* dataset) {
+unsigned char* get_image(int number, unsigned char* dataset) {
     return &dataset[(IMSIZE + 1)*number];
 }
-fm_t* img_to_fm(char* img){
+fm_t* img_to_fm(unsigned char* img){
     fm_t* fm = alloc_fm(3, 32);
     img += 1; // first elem is class
-    for(int i=0; i<3*fm->fsize; ++i) fm->values[i] = ((float)img[i])/255.0f;
+    for(int n=0; n<3; ++n){
+        for(int i=0; i<fm->fdim; ++i){
+            for(int j=0; j<fm->fdim; ++j){
+                fm->values[n*32*32+i*32+j] = ((float)img[n*32*32+i*32+j])/255.0f;
+            }
+        }
+    }
     return fm;
 }
 

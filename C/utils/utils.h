@@ -4,8 +4,8 @@
 #define IMCHANNEL 3
 
 // For the images
-char* read_images(char* filename);
-char* get_image(int number, char* dataset);
+unsigned char* read_images(char* filename);
+unsigned char* get_image(int number, unsigned char* dataset);
 
 // For the layer's weights
 typedef enum layer {CONV, BN, DENSE} layer_t;
@@ -44,7 +44,7 @@ conv_t * read_conv(char* filename);
 dense_t * read_dense(char* filename);
 bn_t * read_bn(char* filename);
 fm_t* alloc_fm(int nchannels, int fdim);
-fm_t* img_to_fm(char* img);
+fm_t* img_to_fm(unsigned char* img);
 
 void print_fm(fm_t* fm, int n);
 

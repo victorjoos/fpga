@@ -50,15 +50,15 @@ resnet_t* build_resnet(int nblocks, char* dir){
     return resnet;
 }
 
-double infer_resnet(resnet_t* resnet, char* imgs, int n_imgs){
+double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
     int ok = 0;
     const int n_stacks=3;
     for(int imgi=0; imgi<n_imgs; ++imgi){
-        char* img = get_image(imgi, imgs);
-        char img_class = img[0];
+        unsigned char* img = get_image(imgi, imgs);
+        unsigned char img_class = img[0];
         fm_t* fm = img_to_fm(img);
         // TODO: remove after testing
-        for(int i=0; i<fm->nchannels*fm->fsize;++i) fm->values[i]=1.0f;
+        // for(int i=0; i<fm->nchannels*fm->fsize;++i) fm->values[i]=(i<2)? 1.0f: 0.0f;
         // First non-residual block
         fm_t* fm_prev = fm;
         fm = convolve(resnet->convs[0], fm, 1); free_fm(fm_prev);
