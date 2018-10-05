@@ -120,6 +120,7 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
         free_fm(fm);
         printf("Expected %d and got %d\n", img_class, maxi);
         ok += (maxi==img_class);
+        printf("rolling average: %f\n", ((double) ok)/((double) imgi+1));
     }
 
     return ((double) ok) / (double)n_imgs;
