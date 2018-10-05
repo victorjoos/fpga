@@ -14,8 +14,8 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides){
     fm_t* fm_out = alloc_fm(conv->size_out, fm_in->fdim/strides);
     const int offset = conv->xsize/2;
     for(int outf=0; outf<conv->size_out; ++outf){
-        for(int _i=0; _i<fm_in->fdim; _i+=strides){
-            for(int _j=0; _j<fm_in->fdim; _j+=strides){
+        for(int _i=(strides==2)?1:0; _i<fm_in->fdim; _i+=strides){
+            for(int _j=(strides==2)?1:0; _j<fm_in->fdim; _j+=strides){
                 int i = _i-offset; int j = _j-offset;
                 float acc = 0.0f;
                 for(int inf=0; inf<conv->size_in; ++inf){

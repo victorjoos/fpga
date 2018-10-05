@@ -65,7 +65,6 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
         fm = convolve(resnet->convs[0], fm, 1); free_fm(fm_prev);
         fm = normalize(resnet->bns[0], fm);
         fm = activate(fm, act_type);
-        print_fm(fm, 0);
         fm_t* fm_shortcut = fm;
 
         int conv_index = 1;
@@ -106,6 +105,7 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
             }
         }
         fm_prev = fm;
+        print_fm(fm, 0);
         fm = avg_pool(fm); free_fm(fm_prev); fm_prev = fm;
         fm = connect(resnet->denses[0], fm); free_fm(fm_prev);
         float maxval = fm->values[0];
