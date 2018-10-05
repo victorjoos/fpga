@@ -44,7 +44,7 @@ conv_t * read_conv(char* filename){
     conv->xsize = sizes[0];
     conv->size_in = sizes[1];
     conv->size_out = sizes[2];
-    printf("%d %d %d \n", conv->xsize, conv->size_in, conv->size_out);
+
     // read remaining values
     int kernel_size = conv->xsize*conv->xsize*conv->size_in*conv->size_out;
     float* values = (float*) malloc(sizeof(float) * (kernel_size + conv->size_out));

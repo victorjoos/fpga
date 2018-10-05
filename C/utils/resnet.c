@@ -98,7 +98,6 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
                 fm = add(fm, fm_shortcut); free_fm(fm_shortcut);
                 fm = divide(fm);
                 fm = activate(fm, act_type);
-                if(bl==0 && st==1) print_fm(fm, 0);
 
                 // Update shortcut value
                 fm_shortcut = fm;
