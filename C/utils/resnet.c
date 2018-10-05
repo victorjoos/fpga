@@ -98,6 +98,7 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
                 fm = add(fm, fm_shortcut); free_fm(fm_shortcut);
                 fm = divide(fm);
                 fm = activate(fm, act_type);
+                if(bl==0 && st==1) print_fm(fm, 0);
 
                 // Update shortcut value
                 fm_shortcut = fm;
@@ -105,7 +106,6 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
             }
         }
         fm_prev = fm;
-        print_fm(fm, 0);
         fm = avg_pool(fm); free_fm(fm_prev); fm_prev = fm;
         fm = connect(resnet->denses[0], fm); free_fm(fm_prev);
         float maxval = fm->values[0];
