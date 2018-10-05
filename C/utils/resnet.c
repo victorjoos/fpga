@@ -62,9 +62,9 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
         // First non-residual block
         fm_t* fm_prev = fm;
         fm = convolve(resnet->convs[0], fm, 1); free_fm(fm_prev);
-        print_fm(fm, 0);
         fm = normalize(resnet->bns[0], fm);
-        fm = activate(fm, RELU);
+        fm = activate(fm, LEAKYRELU);
+        print_fm(fm, 0);
         fm_t* fm_shortcut = fm;
 
         int conv_index = 1;
@@ -78,7 +78,7 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
                 int strides = (st>0 && bl==0)? 2: 1;
                 fm = convolve(resnet->convs[conv_index], fm, strides); ++conv_index;
                 fm = normalize(resnet->bns[bn_index], fm); ++bn_index;
-                fm = activate(fm, RELU);
+                fm = activate(fm, LEAKYRELU);
                 fm_prev = fm;
                 fm = convolve(resnet->convs[conv_index], fm, 1); ++conv_index; free_fm(fm_prev);
                 fm = normalize(resnet->bns[bn_index], fm); ++bn_index;
@@ -97,7 +97,7 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
                 // Addition with shortcut
                 fm = add(fm, fm_shortcut); free_fm(fm_shortcut);
                 fm = divide(fm);
-                fm = activate(fm, RELU);
+                fm = activate(fm, LEAKYRELU);
 
                 // Update shortcut value
                 fm_shortcut = fm;
