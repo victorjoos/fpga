@@ -76,6 +76,7 @@ fm_t* activate(fm_t* fm_in, activation_t activ){
     switch(activ){
         case RELU: f = act_relu; break;
         case LEAKYRELU: f = leaky_relu; break;
+        case TANH: f = act_tanh; break;
         default:  f = act_relu;
     }
     return apply_f(fm_in, f);
