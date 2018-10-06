@@ -70,8 +70,8 @@ def write_dense(d, counter, data):
             fp.write(fldata_to_barr(arr))
 
 
-def main(file):
-    d = "test/"
+def main(file, d):
+    # d = "test/"
     if not os.path.exists(d):
         os.makedirs(d)
     params = h5py.File(file, 'r')
@@ -96,8 +96,8 @@ def main(file):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 3:
         print("Need at least 1 file to parse")
         exit(-1)
-    main(sys.argv[1])
+    main(sys.argv[1], sys.argv[2])
     

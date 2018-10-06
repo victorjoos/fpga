@@ -47,10 +47,10 @@ conv_t * read_conv(char* filename){
 
     // read remaining values
     int kernel_size = conv->xsize*conv->xsize*conv->size_in*conv->size_out;
-    float* values = (float*) malloc(sizeof(float) * (kernel_size + conv->size_out));
-    fread(values, sizeof(float), kernel_size+conv->size_out, fp);
+    int* values = (int*) malloc(sizeof(int) * (kernel_size + conv->size_out));
+    fread(values, sizeof(int), kernel_size+conv->size_out, fp);
     conv->kernel = values;
-    conv->bias = values + kernel_size;
+    conv->bias = (float*) values + kernel_size;
     fclose(fp);
     return conv;
 }
@@ -66,10 +66,10 @@ dense_t * read_dense(char* filename){
     
     // read remaining values
     int kernel_size = dense->size_in*dense->size_out;
-    float* values = (float*) malloc(sizeof(float) * (kernel_size + dense->size_out));
-    fread(values, sizeof(float), kernel_size+dense->size_out, fp);
+    int* values = (int*) malloc(sizeof(int) * (kernel_size + dense->size_out));
+    fread(values, sizeof(int), kernel_size+dense->size_out, fp);
     dense->kernel = values;
-    dense->bias = values + kernel_size;
+    dense->bias = (float*) values + kernel_size;
     fclose(fp);
     return dense;
 }
@@ -96,7 +96,7 @@ fm_t* alloc_fm(int nchannels, int fdim){
     fm_t* fm = (fm_t*) malloc(sizeof(fm_t));
     fm->fdim = fdim; fm->fsize = fdim*fdim;
     fm->nchannels = nchannels;
-    fm->values = (float*) malloc(sizeof(float) * nchannels*fm->fsize);
+    fm->values = (int*) malloc(sizeof(int) * nchannels*fm->fsize);
     return fm;
 }
 
@@ -109,7 +109,7 @@ float get_conv_elem(conv_t* conv, int k, int l, int inf, int outf){
     int xsize = ysize*conv->xsize;
     return conv->kernel[k*xsize + l*ysize + inf*zsize + outf];
 }
-void set_conv_elem(conv_t* conv, float value, int k, int l, int inf, int outf){
+void set_conv_elem(conv_t* conv, int value, int k, int l, int inf, int outf){
     int zsize = conv->size_out;
     int ysize = zsize*conv->size_in;
     int xsize = ysize*conv->xsize;
