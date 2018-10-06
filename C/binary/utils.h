@@ -58,5 +58,5 @@ float get_conv_elem(conv_t* conv, int k, int l, int inf, int outf);
 void set_conv_elem(conv_t* conv, int value, int k, int l, int inf, int outf);
 float get_dense_elem(dense_t* dense, int i, int j);
 float get_fm_elem(fm_t* fm, int channel, int i, int j);
-void set_fm_elem(fm_t* fm, float value, int channel, int i, int j);
+void set_fm_elem(fm_t* fm, int value, int channel, int i, int j);
 #endif

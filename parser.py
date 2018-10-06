@@ -88,10 +88,10 @@ def main(file, d):
                 match = re.match(r'batch_normalization_(\d*)', y)
                 write_bn(d, int(match.groups()[0]), group[y])
             elif "conv2d" in y:
-                match = re.match(r'conv2d_(\d*)', y)
+                match = re.match(r'.*conv2d_(\d*)', y)
                 write_conv(d, int(match.groups()[0]), group[y])
             elif "dense" in y:
-                match = re.match(r'dense_(\d*)', y)
+                match = re.match(r'.*dense_(\d*)', y)
                 write_dense(d, int(match.groups()[0]), group[y])
 
 

@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 #include "utils.h"
 
 const int IMSIZE = IMDIM*IMDIM*IMCHANNEL;
@@ -47,9 +48,12 @@ conv_t * read_conv(char* filename){
 
     // read remaining values
     int kernel_size = conv->xsize*conv->xsize*conv->size_in*conv->size_out;
-    int* values = (int*) malloc(sizeof(int) * (kernel_size + conv->size_out));
+    float* values = (float*) malloc(sizeof(int) * (kernel_size + conv->size_out));
     fread(values, sizeof(int), kernel_size+conv->size_out, fp);
-    conv->kernel = values;
+    for (int i=0; i<kernel_size; i++) {
+        values[i] = roundf(values[i]);
+    }
+    conv->kernel = (int*) values;
     conv->bias = (float*) values + kernel_size;
     fclose(fp);
     return conv;
@@ -123,7 +127,7 @@ float get_fm_elem(fm_t* fm, int channel, int i, int j){
     if((i<0)||(j<0)||(i>=fm->fdim)||(j>=fm->fdim)) return 0.0f;
     return fm->values[channel*fm->fsize + i*fm->fdim + j];
 }
-void set_fm_elem(fm_t* fm, float value, int channel, int i, int j){
+void set_fm_elem(fm_t* fm, int value, int channel, int i, int j){
     fm->values[channel*fm->fsize + i*fm->fdim + j] = value;
 }
 

@@ -53,7 +53,7 @@ fm_t* connect(dense_t* dense, fm_t* fm_in){
 }
 fm_t* avg_pool(fm_t* fm_in){
     fm_t* fm_out = alloc_fm(fm_in->nchannels, 1);
-    float* channel = fm_in->values;
+    float* channel = (float*) fm_in->values;
     for(int n=0; n<fm_in->nchannels; ++n){
         float acc = 0.0f;
         for(int i=0; i<fm_in->fsize; ++i){
@@ -65,23 +65,23 @@ fm_t* avg_pool(fm_t* fm_in){
     return fm_out;
 }
 
-fm_t* apply_f(fm_t* fm_in, float(*f)(float)){
+fm_t* apply_f(fm_t* fm_in, int(*f)(float)){
     const int size = fm_in->nchannels*fm_in->fsize;
     for(int i=0; i<size; ++i)
         fm_in->values[i] = f(fm_in->values[i]);
     return fm_in;
 }
 fm_t* activate(fm_t* fm_in, activation_t activ){
-    float (*f)(float);
+    int (*f)(float);
     switch(activ){
-        case RELU: f = act_relu; break;
-        case LEAKYRELU: f = leaky_relu; break;
+        //case RELU: f = act_relu; break;
+        //case LEAKYRELU: f = leaky_relu; break;
         case TANH: f = act_tanh; break;
-        default:  f = act_relu;
+        default:  f = act_tanh;
     }
     return apply_f(fm_in, f);
 }
-float __div(float x) {return x*0.5f;}
+int __div(float x) {return roundf(x*0.5f);}
 fm_t* divide(fm_t* fm_in){
     return apply_f(fm_in, __div);
 }
@@ -95,7 +95,7 @@ fm_t* add(fm_t* fm_in1, fm_t* fm_in2){
 }
 fm_t* normalize(bn_t* bn, fm_t* fm_in){
     assert(bn->size == fm_in->nchannels);
-    float* values = fm_in->values;
+    float* values = (float*) fm_in->values;
     const float epsilon = 1e-3f;
     for(int n=0; n<fm_in->nchannels; ++n){
         float beta = bn->beta[n];

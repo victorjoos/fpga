@@ -4,12 +4,16 @@
 #include <ctype.h>
 #include <getopt.h>
 // #include <hdf5.h>
-#include "utils/utils.h"
-#include "utils/layers.h"
-#include "utils/resnet.h"
+#include "binary/utils.h"
+#include "binary/layers.h"
+#include "binary/resnet.h"
 
 void print_usage(){
     printf("Usage: ./main -d <directory> -s <resnet-size>\n");
+}
+
+void launch_binary() {
+
 }
 
 int main( int argc, char * argv[]){
@@ -29,7 +33,7 @@ int main( int argc, char * argv[]){
     */
 
     unsigned char* dataset = read_images("../datasets/test_batch.bin");
-    resnet_t* resnet = build_resnet(3, "../test/");
+    resnet_t* resnet = build_resnet(3, "../weights_binary/");
     int n = 1;
     float acc = infer_resnet(resnet, dataset, n);
     printf("%.4f accuracy on %d images\n", acc, n);
