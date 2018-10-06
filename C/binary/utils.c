@@ -50,10 +50,11 @@ conv_t * read_conv(char* filename){
     int kernel_size = conv->xsize*conv->xsize*conv->size_in*conv->size_out;
     float* values = (float*) malloc(sizeof(int) * (kernel_size + conv->size_out));
     fread(values, sizeof(int), kernel_size+conv->size_out, fp);
+    int* values_int = (int*) values;
     for (int i=0; i<kernel_size; i++) {
-        values[i] = roundf(values[i]);
+        values_int[i] = (int) roundf(values[i]);
     }
-    conv->kernel = (int*) values;
+    conv->kernel = (int*) values_int;
     conv->bias = (float*) values + kernel_size;
     fclose(fp);
     return conv;
@@ -72,7 +73,11 @@ dense_t * read_dense(char* filename){
     int kernel_size = dense->size_in*dense->size_out;
     int* values = (int*) malloc(sizeof(int) * (kernel_size + dense->size_out));
     fread(values, sizeof(int), kernel_size+dense->size_out, fp);
-    dense->kernel = values;
+    int* values_int = (int*) values;
+    for (int i=0; i<kernel_size; i++) {
+        values_int[i] = (int) roundf(values[i]);
+    }
+    dense->kernel = values_int;
     dense->bias = (float*) values + kernel_size;
     fclose(fp);
     return dense;
