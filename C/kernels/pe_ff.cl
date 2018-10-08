@@ -1,10 +1,10 @@
 
-__kernel pe_ff( const int conv_size_in, const int conv_size_out,
+__kernel void pe_ff( const int conv_size_in, const int conv_size_out,
                 const int ksize, const int strides, 
                 const int fdim_in, const int fdim_out,
                 __global const float* conv_kernel, __global const float* conv_bias,
                 __global const float* fm_in, __global float* restrict fm_out){
-    printf("ok\n")
+
     const int outf = get_global_id(0);
     // conv consts
     const int zsize = conv_size_out;
@@ -17,7 +17,7 @@ __kernel pe_ff( const int conv_size_in, const int conv_size_out,
     const int fsize_out = fdim_out*fdim_out; // TODO: avoid multiplication in kernel
 
     for(int _i=(strides==2)?offset:0; _i<fdim_in; _i+=strides){
-        for(int _j=(strides==2)?offset:0; _j<fdim_in; _jname +=strides){
+        for(int _j=(strides==2)?offset:0; _j<fdim_in; _j+=strides){
             int i = _i-offset; int j = _j-offset;
             float acc = 0.0f;
             for(int inf=0; inf<conv_size_in; ++inf){

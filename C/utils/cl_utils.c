@@ -15,7 +15,7 @@ int init_cl(cl_space_t* space, char* file_name){
     cl_uint ret_num_devices;
     cl_uint ret_num_platforms;
     cl_int ret = clGetPlatformIDs(1, &platform_id, &ret_num_platforms);
-    ret = clGetDeviceIDs( platform_id, CL_DEVICE_TYPE_DEFAULT, 0,
+    ret = clGetDeviceIDs( platform_id, CL_DEVICE_TYPE_DEFAULT, 1,
             &device_id, &ret_num_devices);
 
     FILE *fp;
@@ -33,10 +33,10 @@ int init_cl(cl_space_t* space, char* file_name){
 
     // Create an OpenCL context
     space->context = clCreateContext( NULL, 1, &device_id, NULL, NULL, &ret);
+    printf("%d\n", ret);
 
     // Create a command queue
     space->queue = clCreateCommandQueue(space->context, device_id, 0, &ret);
-
 
     // Create a program from the kernel source
     space->program = clCreateProgramWithSource(space->context, 1,
