@@ -6,13 +6,14 @@ import numpy as np
 import re
 class Bn():
     def __init__(self, data):
-        self.beta = data["beta:0"]
-        self.gamma = data["gamma:0"]
-        self.mean = data["moving_mean:0"]
-        self.var = data["moving_variance:0"]
+        self.beta = np.array(data["beta:0"]).astype('float32')
+        self.gamma = np.array(data["gamma:0"]).astype('float32')
+        self.mean = np.array(data["moving_mean:0"]).astype('float32')
+        self.var = np.array(data["moving_variance:0"]).astype('float32')
         print(self.beta.shape[0])
         self.sizes = np.array([self.beta.shape[0]]).astype(np.int32).tobytes()
-        self.all = [self.beta, self.gamma, self.mean, self.var]
+        self.all = [self.beta, self.mean, self.gamma/np.sqrt(self.var + 10**-3)]
+        # self.all = [self.beta, self.gamma, self.mean, self.var]
 class Conv():
     def __init__(self, data):
         self.kernel = np.array(data["kernel:0"])
@@ -71,7 +72,7 @@ def write_dense(d, counter, data):
 
 
 def main(file):
-    d = "test/"
+    d = "test2/"
     if not os.path.exists(d):
         os.makedirs(d)
     params = h5py.File(file, 'r')

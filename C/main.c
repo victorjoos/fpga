@@ -7,7 +7,7 @@
 #include "utils/utils.h"
 #include "utils/layers.h"
 #include "utils/resnet.h"
-
+#define CL_DEVICE_TYPE_CPU 2
 void print_usage(){
     printf("Usage: ./main -d <directory> -s <resnet-size>\n");
 }
@@ -29,8 +29,8 @@ int main( int argc, char * argv[]){
     */
 
     unsigned char* dataset = read_images("../datasets/test_batch.bin");
-    resnet_t* resnet = build_resnet(3, "../test/");
-    int n = 1;
+    resnet_t* resnet = build_resnet(3, "../test2/");
+    int n = 10;
     float acc = infer_resnet(resnet, dataset, n);
     printf("%.4f accuracy on %d images\n", acc, n);
     free_resnet(resnet);

@@ -26,9 +26,8 @@ typedef struct dense {
 
 typedef struct bn {
     float * beta;
-    float * gamma;
     float * mean;
-    float * var;
+    float * gamma;
     int size;
 } bn_t;
 typedef struct feature_map{

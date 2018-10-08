@@ -83,12 +83,11 @@ bn_t * read_bn(char* filename){
     bn->size = sizes[0];
     
     // read remaining values
-    float* values = (float*) malloc(sizeof(float) * 4*bn->size);
-    fread(values, sizeof(float), 4*bn->size, fp);
+    float* values = (float*) malloc(sizeof(float) * 3*bn->size);
+    fread(values, sizeof(float), 3*bn->size, fp);
     bn->beta = values;
-    bn->gamma = bn->beta + bn->size;
-    bn->mean = bn->gamma + bn->size;
-    bn->var = bn->mean + bn->size;
+    bn->mean = bn->beta + bn->size;
+    bn->gamma = bn->mean + bn->size;
     fclose(fp);
     return bn;
 }
