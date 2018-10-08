@@ -7,7 +7,7 @@
 #include "utils/utils.h"
 #include "utils/layers.h"
 #include "utils/resnet.h"
-#define CL_DEVICE_TYPE_CPU 2
+
 void print_usage(){
     printf("Usage: ./main -d <directory> -s <resnet-size>\n");
 }

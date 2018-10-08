@@ -6,7 +6,6 @@
 #include "resnet.h"
 #include "layers.h"
 #include "utils.h"
-#define CL_DEVICE_TYPE_CPU 2
 
 char* assemble_name(char* prefix, int suffix, char* buffer){
     sprintf(buffer, "%d", suffix);

@@ -5,7 +5,6 @@
 #include "cl_utils.h"
 #include "utils.h"
 #define MAX_SOURCE_SIZE (0x100000)
-#define CL_DEVICE_TYPE_CPU 2
 
 int init_cl(cl_space_t* space, char* file_name){
     

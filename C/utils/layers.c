@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <math.h>
 #include <assert.h>
-#define CL_DEVICE_TYPE_CPU 2
 
 
 
