@@ -59,7 +59,7 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
 
     cl_int ret;
     space.conv_kernel = clCreateBuffer(space.context, CL_MEM_READ_ONLY,
-            3*3*64 * sizeof(float), NULL, &ret);
+            64*3*3*64 * sizeof(float), NULL, &ret);
     space.conv_bias = clCreateBuffer(space.context, CL_MEM_READ_ONLY,
             64 * sizeof(float), NULL, &ret);            
     space.fm_in = clCreateBuffer(space.context, CL_MEM_READ_ONLY,
