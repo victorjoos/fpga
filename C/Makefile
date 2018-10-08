@@ -2,7 +2,7 @@ CC=gcc
 LIB= -lm -l OpenCL# lhdf5_serial
 CFLAGS= -std=c99 -g -I. #/usr/include/hdf5/serial 
 MAINOBJ=main.o
-OBJ=utils/utils.o utils/layers.o utils/activations.o utils/resnet.o utils/cl_utils.o
+OBJ=utils/utils.o utils/layers.o utils/activations.o utils/resnet.o utils/cl_utils.o timer/timer.o
 TESTOBJ=test.o tests/layers.o
 NAME=main
 

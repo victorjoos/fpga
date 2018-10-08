@@ -7,6 +7,7 @@
 #include "utils/utils.h"
 #include "utils/layers.h"
 #include "utils/resnet.h"
+#include "timer/timer.h"
 
 void print_usage(){
     printf("Usage: ./main -d <directory> -s <resnet-size>\n");
@@ -28,13 +29,16 @@ int main( int argc, char * argv[]){
     printf("%s %d\n", dir, nres);
     */
 
+    timer_t timer;
+    start_timer(&timer);
     unsigned char* dataset = read_images("../datasets/test_batch.bin");
     resnet_t* resnet = build_resnet(3, "../test2/");
-    int n = 1;
+    int n = 1000;
     float acc = infer_resnet(resnet, dataset, n);
     printf("%.4f accuracy on %d images\n", acc, n);
     free_resnet(resnet);
     free(dataset);
+    print_stop_timer(&timer);
     // char* image_10 = get_image(1, dataset);
     // printf("%hhx\n", image_10[0]);
     // conv_t * conv = read_conv("../test/conv_1.bin");
