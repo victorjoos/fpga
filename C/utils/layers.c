@@ -17,6 +17,7 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_space_t* space, cl_ker
     // set kernel arguments
     cl_int ret;
     ret = clSetKernelArg(*kernel, 0, sizeof(int),    (void *)&(conv->size_in));
+    checkError(ret, "Failed to set args");
     ret = clSetKernelArg(*kernel, 1, sizeof(int),    (void *)&(conv->size_out));
     ret = clSetKernelArg(*kernel, 2, sizeof(int),    (void *)&(conv->xsize));
     ret = clSetKernelArg(*kernel, 3, sizeof(int),    (void *)&(strides));
@@ -26,6 +27,7 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_space_t* space, cl_ker
     ret = clSetKernelArg(*kernel, 7, sizeof(cl_mem), (void *)&(space->conv_bias));
     ret = clSetKernelArg(*kernel, 8, sizeof(cl_mem), (void *)&(space->fm_in));
     ret = clSetKernelArg(*kernel, 9, sizeof(cl_mem), (void *)&(space->fm_out));
+    checkError(ret, "Failed to set args");
 
     // Execute the OpenCL kernel
     cl_event event;
@@ -33,8 +35,11 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_space_t* space, cl_ker
     size_t local_size = (size_t) 8;
     ret = clEnqueueNDRangeKernel(space->queue, *kernel, 1, NULL,
             &global_size, &local_size, 0, NULL, &event);
+    checkError(ret, "Failed enqueing kernel");
+    // printf("%d, %d\n", ret, CL_SUCCESS);
     // printf("kernel started\n" );
-    // ret = clWaitForEvents(1, &event);
+    ret = clWaitForEvents(1, &event);
+    checkError(ret, "Failed waiting for events");
     // printf("kernel finished\n");
 
     // take result

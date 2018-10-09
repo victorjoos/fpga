@@ -2,6 +2,7 @@
 #define __opencl_My_clutils 1
 
 #include <CL/cl.h>
+#include <stdarg.h>
 #include "utils.h"
 typedef struct opencl_space{
     cl_context context; 
@@ -24,7 +25,15 @@ void free_cl(   cl_space_t* space,
 
 
 cl_int cl_load_fm(fm_t* fm, cl_space_t* space);
-cl_int cl_load_conv(conv_t* conv, cl_space_t* space);
-cl_int cl_read_fm(fm_t* fm, cl_space_t* space);
+void cl_load_conv(conv_t* conv, cl_space_t* space);
+void cl_read_fm(fm_t* fm, cl_space_t* space);
+
+// Print errors from PipeCNN
+void printError(cl_int error);
+void _checkError(int line, 
+				const char *file, 
+				cl_int error, 
+				const char *msg, ...); // does not return
+#define checkError(status, ...) _checkError(__LINE__, __FILE__, status, __VA_ARGS__)
 
 #endif
