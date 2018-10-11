@@ -6,35 +6,44 @@
 #include <stdlib.h>
 #include <math.h>
 #include <assert.h>
+#include "../config.h"
 
 
 
-fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_space_t* space, cl_kernel* kernel){
+fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_space_t* space, cl_kernel kernel, cl_kernel kernel3){
     assert(conv->size_in == fm_in->nchannels);
     fm_t* fm_out = alloc_fm(conv->size_out, fm_in->fdim/strides);
     cl_load_fm(fm_in, space);
     cl_load_conv(conv, space);
     // set kernel arguments
+    cl_kernel _kernel =(strides==1 && conv->xsize==3)? kernel3: kernel;// (strides==1 && conv->xsize==3)? kernel3: 
+
     cl_int ret;
-    ret = clSetKernelArg(*kernel, 0, sizeof(int),    (void *)&(conv->size_in));
-    checkError(ret, "Failed to set args");
-    ret = clSetKernelArg(*kernel, 1, sizeof(int),    (void *)&(conv->size_out));
-    ret = clSetKernelArg(*kernel, 2, sizeof(int),    (void *)&(conv->xsize));
-    ret = clSetKernelArg(*kernel, 3, sizeof(int),    (void *)&(strides));
-    ret = clSetKernelArg(*kernel, 4, sizeof(int),    (void *)&(fm_in->fdim));
-    ret = clSetKernelArg(*kernel, 5, sizeof(int),    (void *)&(fm_out->fdim));
-    ret = clSetKernelArg(*kernel, 6, sizeof(cl_mem), (void *)&(space->conv_kernel));
-    ret = clSetKernelArg(*kernel, 7, sizeof(cl_mem), (void *)&(space->conv_bias));
-    ret = clSetKernelArg(*kernel, 8, sizeof(cl_mem), (void *)&(space->fm_in));
-    ret = clSetKernelArg(*kernel, 9, sizeof(cl_mem), (void *)&(space->fm_out));
-    checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(_kernel, 0, sizeof(int),    (void *)&(conv->size_in));     checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(_kernel, 1, sizeof(int),    (void *)&(conv->size_out));    checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(_kernel, 2, sizeof(int),    (void *)&(conv->xsize));       checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(_kernel, 3, sizeof(int),    (void *)&(strides));           checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(_kernel, 4, sizeof(int),    (void *)&(fm_in->fdim));       checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(_kernel, 5, sizeof(int),    (void *)&(fm_out->fdim));      checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(_kernel, 6, sizeof(cl_mem), (void *)&(space->conv_kernel));checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(_kernel, 7, sizeof(cl_mem), (void *)&(space->conv_bias));  checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(_kernel, 8, sizeof(cl_mem), (void *)&(space->fm_in));      checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(_kernel, 9, sizeof(cl_mem), (void *)&(space->fm_out));     checkError(ret, "Failed to set args");
+    
 
     // Execute the OpenCL kernel
     cl_event event;
-    size_t global_size = (size_t) conv->size_out;
-    size_t local_size = (size_t) 8;
-    ret = clEnqueueNDRangeKernel(space->queue, *kernel, 1, NULL,
-            &global_size, &local_size, 0, NULL, &event);
+    if(strides==1 && conv->xsize==3){
+        size_t global_size[2] = {(size_t) fm_in->fdim, (size_t) fm_in->fdim};
+        size_t local_size[2] = {(size_t) TILE_SIZE, (size_t) TILE_SIZE};
+        ret = clEnqueueNDRangeKernel(space->queue, _kernel, 2, NULL,
+                global_size, local_size, 0, NULL, &event);
+    }else{
+        size_t global_size = (size_t) conv->size_out;
+        size_t local_size = (size_t) 8;
+        ret = clEnqueueNDRangeKernel(space->queue, _kernel, 1, NULL,
+                &global_size, &local_size, 0, NULL, &event);
+    }
     checkError(ret, "Failed enqueing kernel");
     // printf("%d, %d\n", ret, CL_SUCCESS);
     // printf("kernel started\n" );
