@@ -98,7 +98,8 @@ fm_t* alloc_fm(int nchannels, int fdim){
     fm_t* fm = (fm_t*) malloc(sizeof(fm_t));
     fm->fdim = fdim; fm->fsize = fdim*fdim;
     fm->nchannels = nchannels;
-    fm->values = (float*) malloc(sizeof(float) * nchannels*fm->fsize);
+    // fm->values = (float*) malloc(sizeof(float) * nchannels*fm->fsize);
+    fm->values = (float*) clSVMAlloc(space->context, CL_MEM_READ_WRITE, sizeof(float) * (nchannels * fm->fsize), 0);
     return fm;
 }
 
@@ -154,5 +155,5 @@ void free_bn(bn_t* bn){
     free(bn);
 }
 void free_fm(fm_t* fm){
-    free(fm->values); free(fm);
+    clSVMFree(space->context, fm->values); free(fm);
 }
