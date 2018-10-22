@@ -140,11 +140,13 @@ void print_fm(fm_t* fm, int n){
 }
 
 void free_conv(conv_t* conv){
-    free(conv->kernel);
+    // free(conv->kernel);
+    clSVMFree(space->context, conv->kernel);
     free(conv);
 }
 void free_dense(dense_t* dense){
-    free(dense->kernel);
+    // free(dense->kernel);
+    clSVMFree(space->context, dense->kernel);
     free(dense);
 }
 void free_bn(bn_t* bn){
