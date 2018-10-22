@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "utils.h"
+#include "CL/cl.h"
 
 const int IMSIZE = IMDIM*IMDIM*IMCHANNEL;
 unsigned char* read_images(char* filename) {
@@ -48,6 +49,7 @@ conv_t * read_conv(char* filename){
     // read remaining values
     int kernel_size = conv->xsize*conv->xsize*conv->size_in*conv->size_out;
     float* values = (float*) malloc(sizeof(float) * (kernel_size + conv->size_out));
+    // float* values = (float*) clSVMAlloc(s)
     fread(values, sizeof(float), kernel_size+conv->size_out, fp);
     conv->kernel = values;
     conv->bias = values + kernel_size;

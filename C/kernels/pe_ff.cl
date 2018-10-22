@@ -22,11 +22,12 @@ __kernel void pe_ff( const int conv_size_in, const int conv_size_out,
                 __global const float* fm_in, __global float* fm_out){
 
     const int outf = get_global_id(0);
+    // printf("hello from conv\n");
     // conv consts
     const int zsize = conv_size_out;
     const int ysize = zsize*conv_size_in;
     const int xsize = ysize*ksize;         // TODO: avoid multiplication in kernel
-    const int offset = ksize>>1;
+    const int offset = ksize>>2;
     
     // fm consts
     const int fsize_in = fdim_in*fdim_in; // TODO: avoid multiplication in kernel
@@ -34,7 +35,8 @@ __kernel void pe_ff( const int conv_size_in, const int conv_size_out,
     
     for(int _i=(strides==2)?offset:0; _i<fdim_in; _i+=strides){
         for(int _j=(strides==2)?offset:0; _j<fdim_in; _j+=strides){
-            int i = _i-offset; int j = _j-offset;
+            int i = _i-offset; 
+            int j = _j-offset;
             float acc = 0.0f;
             for(int inf=0; inf<conv_size_in; ++inf){
                 for(int k=0; k<ksize; ++k){

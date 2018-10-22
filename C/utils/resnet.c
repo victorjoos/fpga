@@ -54,21 +54,18 @@ resnet_t* build_resnet(int nblocks, char* dir){
 
 
 double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
-    cl_space_t space;
-    init_cl(&space, "kernels/pe_ff.cl");
-
     cl_int ret;
-    space.conv_kernel = clCreateBuffer(space.context, CL_MEM_READ_ONLY,
+    space->conv_kernel = clCreateBuffer(space->context, CL_MEM_READ_ONLY,
             64*3*3*64 * sizeof(float), NULL, &ret);
-    space.conv_bias = clCreateBuffer(space.context, CL_MEM_READ_ONLY,
+    space->conv_bias = clCreateBuffer(space->context, CL_MEM_READ_ONLY,
             64 * sizeof(float), NULL, &ret);            
-    space.fm_in = clCreateBuffer(space.context, CL_MEM_READ_ONLY,
+    space->fm_in = clCreateBuffer(space->context, CL_MEM_READ_ONLY,
             32*32*16 * sizeof(float), NULL, &ret);
-    space.fm_out = clCreateBuffer(space.context, CL_MEM_WRITE_ONLY,
+    space->fm_out = clCreateBuffer(space->context, CL_MEM_WRITE_ONLY,
             32*32*16 * sizeof(float), NULL, &ret);
 
     cl_kernel conv_kernel;
-    load_kernel("pe_ff", &space, &conv_kernel);
+    load_kernel("pe_ff", &conv_kernel);
 
 
     int ok = 0;
@@ -81,7 +78,7 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
         // First non-residual block
         fm_t* fm_prev = fm;
         activation_t act_type = TANH;
-        fm = convolve(resnet->convs[0], fm, 1, &space, &conv_kernel); free_fm(fm_prev);
+        fm = convolve(resnet->convs[0], fm, 1, &conv_kernel); free_fm(fm_prev);
         fm = normalize(resnet->bns[0], fm);
         fm = activate(fm, act_type);
         fm_t* fm_shortcut = fm;
@@ -95,11 +92,11 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
             for(int bl=0; bl<resnet->nblocks; ++bl){
                 // Main block C->BN->Act->C->BN
                 int strides = (st>0 && bl==0)? 2: 1;
-                fm = convolve(resnet->convs[conv_index], fm, strides, &space, &conv_kernel); ++conv_index;
+                fm = convolve(resnet->convs[conv_index], fm, strides, &conv_kernel); ++conv_index;
                 fm = normalize(resnet->bns[bn_index], fm); ++bn_index;
                 fm = activate(fm, act_type);
                 fm_prev = fm;
-                fm = convolve(resnet->convs[conv_index], fm, 1, &space, &conv_kernel); ++conv_index; free_fm(fm_prev);
+                fm = convolve(resnet->convs[conv_index], fm, 1, &conv_kernel); ++conv_index; free_fm(fm_prev);
                 fm = normalize(resnet->bns[bn_index], fm); ++bn_index;
                 
                 // Update indices (not very beautyful but easier than recalculating)
@@ -109,7 +106,7 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
                     // shortcut with dim reduction between stacks
                     fm_prev = fm_shortcut;
                     fm_shortcut = convolve(resnet->convs[short_conv_index], 
-                                            fm_shortcut, 2, &space, &conv_kernel);
+                                            fm_shortcut, 2, &conv_kernel);
                     free_fm(fm_prev);
                 }
 
@@ -141,6 +138,6 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
         ok += (maxi==img_class);
         printf("rolling average: %f\n", ((double) ok)/((double) imgi+1));
     }
-    free_cl(&space, &conv_kernel );
+    free_cl(&conv_kernel );
     return ((double) ok) / (double)n_imgs;
 }

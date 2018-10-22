@@ -2,10 +2,24 @@
 #define __utility_opencl__ 1
 #define IMDIM 32
 #define IMCHANNEL 3
+#include "cl_space.h"
+#include <CL/cl.h>
 
 // For the images
 unsigned char* read_images(char* filename);
 unsigned char* get_image(int number, unsigned char* dataset);
+
+// typedef struct opencl_space{
+//     cl_context context; 
+//     cl_command_queue queue;
+//     cl_program program;
+//     cl_mem conv_kernel;
+//     cl_mem conv_bias;
+//     cl_mem fm_in;
+//     cl_mem fm_out;
+// }cl_space_t;
+
+extern cl_space_t *space;
 
 // For the layer's weights
 typedef enum layer {CONV, BN, DENSE} layer_t;

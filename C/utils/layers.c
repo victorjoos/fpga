@@ -9,11 +9,11 @@
 
 
 
-fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_space_t* space, cl_kernel* kernel){
+fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_kernel* kernel){
     assert(conv->size_in == fm_in->nchannels);
     fm_t* fm_out = alloc_fm(conv->size_out, fm_in->fdim/strides);
-    cl_load_fm(fm_in, space);
-    cl_load_conv(conv, space);
+    cl_load_fm(fm_in);
+    cl_load_conv(conv);
     // set kernel arguments
     cl_int ret;
     ret = clSetKernelArg(*kernel, 0, sizeof(int),    (void *)&(conv->size_in));
@@ -43,7 +43,7 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_space_t* space, cl_ker
     // printf("kernel finished\n");
 
     // take result
-    cl_read_fm(fm_out, space);
+    cl_read_fm(fm_out);
     return fm_out;
 }
 fm_t* fully_connect(dense_t* dense, fm_t* fm_in){

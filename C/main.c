@@ -7,7 +7,10 @@
 #include "utils/utils.h"
 #include "utils/layers.h"
 #include "utils/resnet.h"
+#include "utils/cl_utils.h"
 #include "timer/timer.h"
+
+cl_space_t * space;
 
 void print_usage(){
     printf("Usage: ./main -d <directory> -s <resnet-size>\n");
@@ -31,6 +34,9 @@ int main( int argc, char * argv[]){
 
     timer_t timer;
     start_timer(&timer);
+    space = (cl_space_t *) malloc(sizeof(struct opencl_space));
+    init_cl("kernels/pe_ff.cl");
+
     unsigned char* dataset = read_images("../datasets/test_batch.bin");
     resnet_t* resnet = build_resnet(3, "../test2/");
     int n = 1000;
