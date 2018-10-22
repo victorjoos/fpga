@@ -23,10 +23,10 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_kernel* kernel){
     ret = clSetKernelArg(*kernel, 3, sizeof(int),    (void *)&(strides));
     ret = clSetKernelArg(*kernel, 4, sizeof(int),    (void *)&(fm_in->fdim));
     ret = clSetKernelArg(*kernel, 5, sizeof(int),    (void *)&(fm_out->fdim));
-    ret = clSetKernelArg(*kernel, 6, sizeof(cl_mem), (void *)&(space->conv_kernel));
-    ret = clSetKernelArg(*kernel, 7, sizeof(cl_mem), (void *)&(space->conv_bias));
-    ret = clSetKernelArg(*kernel, 8, sizeof(cl_mem), (void *)&(space->fm_in));
-    ret = clSetKernelArg(*kernel, 9, sizeof(cl_mem), (void *)&(space->fm_out));
+    ret = clSetKernelArg(*kernel, 6, sizeof(cl_mem), (void *)&(conv->kernel));
+    ret = clSetKernelArg(*kernel, 7, sizeof(cl_mem), (void *)&(conv->bias));
+    ret = clSetKernelArg(*kernel, 8, sizeof(cl_mem), (void *)&(fm_in->values));
+    ret = clSetKernelArg(*kernel, 9, sizeof(cl_mem), (void *)&(fm_out->values));
     checkError(ret, "Failed to set args");
 
     // Execute the OpenCL kernel

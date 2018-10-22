@@ -55,14 +55,14 @@ resnet_t* build_resnet(int nblocks, char* dir){
 
 double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
     cl_int ret;
-    space->conv_kernel = clCreateBuffer(space->context, CL_MEM_READ_ONLY,
+    /*space->conv_kernel = clCreateBuffer(space->context, CL_MEM_READ_ONLY,
             64*3*3*64 * sizeof(float), NULL, &ret);
     space->conv_bias = clCreateBuffer(space->context, CL_MEM_READ_ONLY,
             64 * sizeof(float), NULL, &ret);            
     space->fm_in = clCreateBuffer(space->context, CL_MEM_READ_ONLY,
             32*32*16 * sizeof(float), NULL, &ret);
     space->fm_out = clCreateBuffer(space->context, CL_MEM_WRITE_ONLY,
-            32*32*16 * sizeof(float), NULL, &ret);
+            32*32*16 * sizeof(float), NULL, &ret);*/
 
     cl_kernel conv_kernel;
     load_kernel("pe_ff", &conv_kernel);
