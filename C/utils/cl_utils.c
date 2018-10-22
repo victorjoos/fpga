@@ -56,9 +56,12 @@ int init_cl(char* file_name){
     checkError(ret, "Failed create command queue");
 
     // Create a program from the kernel source
-    /*space->program = clCreateProgramWithSource(space->context, 1,
-            (const char **)&source_str, (const size_t *)&source_size, &ret);*/
+	#ifndef FPGA_BUILD 
+    space->program = clCreateProgramWithSource(space->context, 1,
+            (const char **)&source_str, (const size_t *)&source_size, &ret);
+	#else
 	space->program = clCreateProgramWithBinary(space->context, 1, &device_id,  (const size_t*) &source_size, (const unsigned char**) &source_str, NULL, &ret);
+	#endif
     checkError(ret, "Failed create program with source");
 	// Build the program
     ret = clBuildProgram(space->program, 1, &device_id, NULL, NULL, NULL);
