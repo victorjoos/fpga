@@ -22,7 +22,7 @@ char* get_image(int number, char* dataset) {
 }
 
 
-int main(){
+int main_1(){
     char* dataset = read_images("../datasets/test_batch.bin");
     char* image_10 = get_image(55, dataset) + 1;
 

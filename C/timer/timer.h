@@ -3,8 +3,8 @@
 typedef struct timer {
   struct timeval start;
   struct timeval stop;
-} timer_t;
+} my_timer_t;
 
-void start_timer(timer_t * timer);
-double stop_timer(timer_t * timer);
-void print_stop_timer(timer_t * timer);
+void start_timer(my_timer_t * timer);
+double stop_timer(my_timer_t * timer);
+void print_stop_timer(my_timer_t * timer);

@@ -29,7 +29,7 @@ int main( int argc, char * argv[]){
     printf("%s %d\n", dir, nres);
     */
 
-    timer_t timer;
+    my_timer_t timer;
     start_timer(&timer);
     unsigned char* dataset = read_images("../datasets/test_batch.bin");
     resnet_t* resnet = build_resnet(3, "../test2/");
