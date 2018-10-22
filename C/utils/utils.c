@@ -48,8 +48,8 @@ conv_t * read_conv(char* filename){
 
     // read remaining values
     int kernel_size = conv->xsize*conv->xsize*conv->size_in*conv->size_out;
-    float* values = (float*) malloc(sizeof(float) * (kernel_size + conv->size_out));
-    // float* values = (float*) clSVMAlloc(s)
+    // float* values = (float*) malloc(sizeof(float) * (kernel_size + conv->size_out));
+    float* values = (float*) clSVMAlloc(space->context, CL_MEM_READ_ONLY, sizeof(float) * (kernel_size + conv->size_out), 0);
     fread(values, sizeof(float), kernel_size+conv->size_out, fp);
     conv->kernel = values;
     conv->bias = values + kernel_size;
@@ -68,7 +68,8 @@ dense_t * read_dense(char* filename){
     
     // read remaining values
     int kernel_size = dense->size_in*dense->size_out;
-    float* values = (float*) malloc(sizeof(float) * (kernel_size + dense->size_out));
+    // float* values = (float*) malloc(sizeof(float) * (kernel_size + dense->size_out));
+    float* values = (float*) clSVMAlloc(space->context, CL_MEM_READ_ONLY, sizeof(float) * (kernel_size + dense->size_out), 0);
     fread(values, sizeof(float), kernel_size+dense->size_out, fp);
     dense->kernel = values;
     dense->bias = values + kernel_size;
