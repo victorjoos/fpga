@@ -20,7 +20,6 @@ __kernel void pe_ff( const int conv_size_in, const int conv_size_out,
                 const int fdim_in, const int fdim_out,
                 __global const float* conv_kernel, __global const float* conv_bias,
                 __global const float* fm_in, __global float* fm_out){
-
     const int outf = get_global_id(0);
     // printf("hello from conv\n");
     // conv consts
@@ -48,9 +47,10 @@ __kernel void pe_ff( const int conv_size_in, const int conv_size_out,
                     }
                 }
             }
-            acc += conv_bias[outf];
+            acc = conv_bias[outf];
             fm_out[outf*fsize_out + _i/strides*fdim_out + _j/strides] = acc;
         }
     }
+    printf("Hello from kernel\n");
 }
 

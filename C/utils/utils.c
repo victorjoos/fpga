@@ -49,10 +49,12 @@ conv_t * read_conv(char* filename){
     // read remaining values
     int kernel_size = conv->xsize*conv->xsize*conv->size_in*conv->size_out;
     // float* values = (float*) malloc(sizeof(float) * (kernel_size + conv->size_out));
-    float* values = (float*) clSVMAlloc(space->context, CL_MEM_READ_ONLY, sizeof(float) * (kernel_size + conv->size_out), 0);
-    fread(values, sizeof(float), kernel_size+conv->size_out, fp);
+    float* values = (float*) clSVMAlloc(space->context, CL_MEM_READ_WRITE, sizeof(float) * kernel_size, 0);
+    fread(values, sizeof(float), kernel_size, fp);
     conv->kernel = values;
-    conv->bias = values + kernel_size;
+    values = (float*) clSVMAlloc(space->context, CL_MEM_READ_WRITE, sizeof(float) * conv->size_out, 0);
+    fread(values, sizeof(float), conv->size_out, fp);
+    conv->bias = values;
     fclose(fp);
     return conv;
 }
@@ -69,7 +71,7 @@ dense_t * read_dense(char* filename){
     // read remaining values
     int kernel_size = dense->size_in*dense->size_out;
     // float* values = (float*) malloc(sizeof(float) * (kernel_size + dense->size_out));
-    float* values = (float*) clSVMAlloc(space->context, CL_MEM_READ_ONLY, sizeof(float) * (kernel_size + dense->size_out), 0);
+    float* values = (float*) clSVMAlloc(space->context, CL_MEM_READ_WRITE, sizeof(float) * (kernel_size + dense->size_out), 0);
     fread(values, sizeof(float), kernel_size+dense->size_out, fp);
     dense->kernel = values;
     dense->bias = values + kernel_size;
@@ -143,6 +145,7 @@ void print_fm(fm_t* fm, int n){
 void free_conv(conv_t* conv){
     // free(conv->kernel);
     clSVMFree(space->context, conv->kernel);
+    clSVMFree(space->context, conv->bias);
     free(conv);
 }
 void free_dense(dense_t* dense){

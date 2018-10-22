@@ -1,7 +1,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <CL/cl.h>
+#include <CL/opencl.h>
 #include "cl_utils.h"
 #include "utils.h"
 #define MAX_SOURCE_SIZE (0x100000)

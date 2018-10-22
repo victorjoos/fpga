@@ -3,7 +3,7 @@
 #define IMDIM 32
 #define IMCHANNEL 3
 #include "cl_space.h"
-#include <CL/cl.h>
+#include <CL/opencl.h>
 
 // For the images
 unsigned char* read_images(char* filename);
