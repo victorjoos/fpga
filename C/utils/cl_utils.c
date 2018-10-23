@@ -104,7 +104,7 @@ void free_cl(cl_kernel * kernel){
 cl_int cl_load_fm(fm_t* fm){
     /*cl_int ret = clEnqueueWriteBuffer(space->queue, space->fm_in, CL_TRUE, 0,
             fm->nchannels*fm->fsize * sizeof(float), fm->values, 0, NULL, NULL);*/
-	cl_int ret = clEnqueueSVMMap(space->queue, CL_TRUE, CL_MAP_WRITE, (void*) fm->values,
+	cl_int ret = clEnqueueSVMMap(space->queue, CL_TRUE, CL_MAP_READ, (void*) fm->values,
 		fm->nchannels*fm->fsize * sizeof(float), 0, NULL, NULL);
     checkError(ret, "failed loading FMap");
 }
@@ -113,14 +113,14 @@ void cl_load_conv(conv_t* conv){
     /*cl_int ret = clEnqueueWriteBuffer(space->queue, space->conv_kernel, CL_TRUE, 0,
             conv->size_in*conv->size_out*conv->xsize*conv->xsize * sizeof(float), 
             conv->kernel, 0, NULL, NULL);*/
-	cl_int ret = clEnqueueSVMMap(space->queue, CL_TRUE, CL_MAP_WRITE, (void*) conv->kernel,
+	cl_int ret = clEnqueueSVMMap(space->queue, CL_TRUE, CL_MAP_READ, (void*) conv->kernel,
 		conv->size_in*conv->size_out*conv->xsize*conv->xsize * sizeof(float),
 		0, NULL, NULL);
     checkError(ret, "failed loading conv kernel");
     /*ret = clEnqueueWriteBuffer(space->queue, space->conv_bias, CL_TRUE, 0,
             conv->size_out * sizeof(float), 
             conv->bias, 0, NULL, NULL);*/
-	ret = clEnqueueSVMMap(space->queue, CL_TRUE, CL_MAP_WRITE, (void*) conv->bias,
+	ret = clEnqueueSVMMap(space->queue, CL_TRUE, CL_MAP_READ, (void*) conv->bias,
 		conv->size_out * sizeof(float),
 		0, NULL, NULL);
     checkError(ret, "failed loading bias");

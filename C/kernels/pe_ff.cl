@@ -26,7 +26,7 @@ __kernel void pe_ff( const int conv_size_in, const int conv_size_out,
     const int zsize = conv_size_out;
     const int ysize = zsize*conv_size_in;
     const int xsize = ysize*ksize;         // TODO: avoid multiplication in kernel
-    const int offset = ksize>>1;
+    const int offset = ksize/2;
     
     // fm consts
     const int fsize_in = fdim_in*fdim_in; // TODO: avoid multiplication in kernel
@@ -47,10 +47,9 @@ __kernel void pe_ff( const int conv_size_in, const int conv_size_out,
                     }
                 }
             }
-            acc = conv_bias[outf];
+            acc += conv_bias[outf];
             fm_out[outf*fsize_out + _i/strides*fdim_out + _j/strides] = acc;
         }
     }
-    printf("Hello from kernel\n");
 }
 

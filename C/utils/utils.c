@@ -101,7 +101,7 @@ fm_t* alloc_fm(int nchannels, int fdim){
     fm->fdim = fdim; fm->fsize = fdim*fdim;
     fm->nchannels = nchannels;
     // fm->values = (float*) malloc(sizeof(float) * nchannels*fm->fsize);
-    fm->values = (float*) clSVMAlloc(space->context, CL_MEM_READ_WRITE, sizeof(float) * (nchannels * fm->fsize), 0);
+    fm->values = (float*) clSVMAlloc(space->context, CL_MEM_READ_ONLY, sizeof(float) * (nchannels * fm->fsize), 0);
     return fm;
 }
 
