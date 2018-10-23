@@ -77,6 +77,7 @@ __kernel void pe_tile_ff( const int conv_size_in, const int conv_size_out,
     const int global_j = TILE_SIZE*get_group_id(1)+ local_j;
 
     __local float fm_in_local[TILE_SIZE+2][TILE_SIZE+2];
+    __local float kern_in_local[3][3];
     float acc;
 
     const int n_tiles = conv_size_out/TILE_SIZE;
@@ -97,13 +98,17 @@ __kernel void pe_tile_ff( const int conv_size_in, const int conv_size_out,
                         fm_in_local[2*local_i+li][2*local_j+lj] = fm_elem;
                     }
                 }
-
+                if(local_i<3 && local_j<3){ //TODO: make independent from TILE_SIZE
+                    int k = local_i;
+                    int l = local_j;
+                    kern_in_local[k][l] = conv_kernel[k*xsize + l*ysize + inf*zsize + outf];
+                }
                 barrier(CLK_LOCAL_MEM_FENCE);
                 int i = local_i; int j = local_j;
-                for(int k=0; k<ksize; ++k){
-                    for(int l=0; l<ksize; ++l){
+                for(int k=0; k<3; ++k){
+                    for(int l=0; l<3; ++l){
                         float fm_elem = fm_in_local[i+k][j+l];                                              
-                        acc += conv_kernel[k*xsize + l*ysize + inf*zsize + outf] * fm_elem;
+                        acc += kern_in_local[k][l] * fm_elem;
                     }
                 }
                 barrier(CLK_LOCAL_MEM_FENCE);
