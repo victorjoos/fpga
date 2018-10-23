@@ -73,48 +73,58 @@ __kernel void pe_tile_ff( const int conv_size_in, const int conv_size_out,
 
     const int local_i = get_local_id(0);
     const int local_j = get_local_id(1);
-    const int global_i = TILE_SIZE*get_group_id(0) + local_i;
+    const int global_i = TILE_SIZE*2*get_group_id(0) + local_i;
+    const int global_i2 = TILE_SIZE*(2*get_group_id(0)+1) + local_i;
     const int global_j = TILE_SIZE*get_group_id(1)+ local_j;
 
     __local float fm_in_local[TILE_SIZE+2][TILE_SIZE+2];
     __local float kern_in_local[3][3];
-    float acc;
+    float acc[2];
 
     const int n_tiles = conv_size_out/TILE_SIZE;
     for(int outf=0; outf<conv_size_out; ++outf){
-            acc = 0.0f;
+            acc[0] = 0.0f;
+            acc[1] = 0.0f;
             for(int inf=0; inf<conv_size_in; ++inf){
-                // Load into shared memory
-                int ii = TILE_SIZE*get_group_id(0) + 2*local_i - 1;
-                int jj = TILE_SIZE*get_group_id(1) + 2*local_j - 1;
-                for(int li=0; li<2; ++li){
-                    for(int lj=0; lj<2; ++lj){
-                        if(2*local_i+li>=TILE_SIZE+2) continue;
-                        if(2*local_j+lj>=TILE_SIZE+2) continue;
-
-                        float fm_elem;
-                        if((ii+li<0)||(jj+lj<0)||(ii+li>=fdim_in)||(jj+lj>=fdim_in)) fm_elem = 0.0f;
-                        else fm_elem = fm_in[inf*fsize_in + (ii+li)*fdim_in + (jj+lj)];
-                        fm_in_local[2*local_i+li][2*local_j+lj] = fm_elem;
-                    }
-                }
                 if(local_i<3 && local_j<3){ //TODO: make independent from TILE_SIZE
                     int k = local_i;
                     int l = local_j;
                     kern_in_local[k][l] = conv_kernel[k*xsize + l*ysize + inf*zsize + outf];
                 }
                 barrier(CLK_LOCAL_MEM_FENCE);
-                int i = local_i; int j = local_j;
-                for(int k=0; k<3; ++k){
-                    for(int l=0; l<3; ++l){
-                        float fm_elem = fm_in_local[i+k][j+l];                                              
-                        acc += kern_in_local[k][l] * fm_elem;
+                for(int shift=0; shift<2; ++shift){
+                    // Load into shared memory
+                    int ii = TILE_SIZE*(2*get_group_id(0)+shift) + 2*local_i - 1;
+                    int jj = TILE_SIZE*get_group_id(1) + 2*local_j - 1;
+                    for(int li=0; li<2; ++li){
+                        for(int lj=0; lj<2; ++lj){
+                            if(2*local_i+li>=TILE_SIZE+2) continue;
+                            if(2*local_j+lj>=TILE_SIZE+2) continue;
+
+                            float fm_elem;
+                            if((ii+li<0)||(jj+lj<0)||(ii+li>=fdim_in)||(jj+lj>=fdim_in)) fm_elem = 0.0f;
+                            else fm_elem = fm_in[inf*fsize_in + (ii+li)*fdim_in + (jj+lj)];
+                            fm_in_local[2*local_i+li][2*local_j+lj] = fm_elem;
+                        }
                     }
+                    barrier(CLK_LOCAL_MEM_FENCE);
+                    float _acc = 0.0f;
+                    int i = local_i; int j = local_j;
+                    for(int k=0; k<3; ++k){
+                        for(int l=0; l<3; ++l){
+                            float fm_elem = fm_in_local[i+k][j+l];                                              
+                            _acc += kern_in_local[k][l] * fm_elem;
+                        }
+                    }
+                    acc[shift] += _acc;
+                    barrier(CLK_LOCAL_MEM_FENCE);
                 }
-                barrier(CLK_LOCAL_MEM_FENCE);
             }
-            acc += conv_bias[outf];
-            fm_out[outf*fsize_out + global_i*fdim_out + global_j] = acc;
+            // if(outf==0) printf("%.3f, %.3f\n", acc[0], acc[1]);
+            acc[0] += conv_bias[outf];
+            acc[1] += conv_bias[outf];
+            fm_out[outf*fsize_out + global_i*fdim_out + global_j] = acc[0];
+            fm_out[outf*fsize_out + global_i2*fdim_out + global_j] = acc[1];
         }
 }
 
