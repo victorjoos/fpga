@@ -4,6 +4,7 @@
 #include <CL/opencl.h>
 #include "cl_utils.h"
 #include "utils.h"
+#include <assert.h>
 #define MAX_SOURCE_SIZE (0x100000)
 
 int init_cl(char* file_name){
@@ -71,6 +72,17 @@ int init_cl(char* file_name){
     char *buffer = calloc(len, sizeof(char));
     ret = clGetProgramBuildInfo(space->program, device_id, CL_PROGRAM_BUILD_LOG, len, buffer, NULL);
     printf("%d\nHello : \n%s\n", ret, buffer);
+
+	// Create fm-buffers
+	for (int i=0; i<NMB_FM; ++i) {
+		space->fm_fpga_buffers[i] = clCreateBuffer(space->context, CL_MEM_ALLOC_HOST_PTR, sizeof(float) * MAX_FM_SIZE, NULL, &ret);
+		checkError(ret, "Failed to create buffer");
+		assert (space->fm_fpga_buffers[i] != NULL);
+		space->fm_buffers[i] = (float*) clEnqueueMapBuffer(space->queue, space->fm_fpga_buffers[i], CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(float) * MAX_FM_SIZE, 0, NULL, NULL, NULL);
+		assert (space->fm_buffers[i] != NULL);
+	}
+	space->act=0;
+
     return 1;
 }
 
@@ -83,14 +95,18 @@ int load_kernel(char* kernel_name,
     // create kernel
     *kernel = clCreateKernel(space->program, kernel_name, &ret);
     checkError(ret, "Failed creating kernel");
+
+	
+
     return 1;
 }
 
 void free_cl(cl_kernel * kernel){
-    clReleaseMemObject(space->conv_kernel);
-    clReleaseMemObject(space->conv_bias);
-    clReleaseMemObject(space->fm_in);
-    clReleaseMemObject(space->fm_out);
+    for (int i=0; i<NMB_FM; ++i) {
+		clReleaseMemObject(space->fm_fpga_buffers[i]);
+		clEnqueueUnmapMemObject (space->queue, space->fm_fpga_buffers[i], 
+					(void*)space->fm_buffers[i], 0, NULL, NULL);
+	}
     cl_int ret;
     ret = clFlush(space->queue);
     ret = clFinish(space->queue);

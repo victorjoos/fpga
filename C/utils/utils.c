@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <assert.h>
 #include "utils.h"
+#include "cl_utils.h"
 #include "CL/cl.h"
 
 const int IMSIZE = IMDIM*IMDIM*IMCHANNEL;
@@ -11,6 +13,21 @@ unsigned char* read_images(char* filename) {
     fread(buffer, sizeof(unsigned char), filelen, fileptr);
     fclose(fileptr);
     return buffer;
+}
+
+cl_mem alloc_shared_buffer (size_t size, float **host_ptr) {
+  cl_int status;
+  cl_mem device_ptr = clCreateBuffer(space->context, CL_MEM_ALLOC_HOST_PTR, sizeof(float) * size, NULL, &status);
+  checkError(status, "Failed to create buffer");
+  assert (host_ptr != NULL);
+  *host_ptr = (float*) clEnqueueMapBuffer(space->queue, device_ptr, CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(float) * size, 0, NULL, NULL, NULL);
+  assert (*host_ptr != NULL);
+  return device_ptr;
+    // int act = space->act;
+    // space->act = (act+1)%NMB_FM;
+    // *host_ptr = space->fm_buffers[act];
+
+    // return space->fm_fpga_buffers[act];
 }
 
 /**
@@ -48,11 +65,12 @@ conv_t * read_conv(char* filename){
 
     // read remaining values
     int kernel_size = conv->xsize*conv->xsize*conv->size_in*conv->size_out;
-    // float* values = (float*) malloc(sizeof(float) * (kernel_size + conv->size_out));
-    float* values = (float*) clSVMAlloc(space->context, CL_MEM_READ_WRITE, sizeof(float) * kernel_size, 0);
+
+    float* values;
+    conv->fpga_kernel = alloc_shared_buffer(kernel_size, &values);
     fread(values, sizeof(float), kernel_size, fp);
     conv->kernel = values;
-    values = (float*) clSVMAlloc(space->context, CL_MEM_READ_WRITE, sizeof(float) * conv->size_out, 0);
+    conv->fpga_bias = alloc_shared_buffer(conv->size_out, &values);
     fread(values, sizeof(float), conv->size_out, fp);
     conv->bias = values;
     fclose(fp);
@@ -70,11 +88,13 @@ dense_t * read_dense(char* filename){
     
     // read remaining values
     int kernel_size = dense->size_in*dense->size_out;
-    // float* values = (float*) malloc(sizeof(float) * (kernel_size + dense->size_out));
-    float* values = (float*) clSVMAlloc(space->context, CL_MEM_READ_WRITE, sizeof(float) * (kernel_size + dense->size_out), 0);
-    fread(values, sizeof(float), kernel_size+dense->size_out, fp);
+    float* values;
+    dense->fpga_kernel = alloc_shared_buffer(kernel_size, &values);
+    fread(values, sizeof(float), kernel_size, fp);
     dense->kernel = values;
-    dense->bias = values + kernel_size;
+    dense->fpga_bias = alloc_shared_buffer(dense->size_out, &values);
+    fread(values, sizeof(float), dense->size_out, fp);
+    dense->bias = values;
     fclose(fp);
     return dense;
 }
@@ -100,8 +120,10 @@ fm_t* alloc_fm(int nchannels, int fdim){
     fm_t* fm = (fm_t*) malloc(sizeof(fm_t));
     fm->fdim = fdim; fm->fsize = fdim*fdim;
     fm->nchannels = nchannels;
-    // fm->values = (float*) malloc(sizeof(float) * nchannels*fm->fsize);
-    fm->values = (float*) clSVMAlloc(space->context, CL_MEM_READ_ONLY, sizeof(float) * (nchannels * fm->fsize), 0);
+
+    float * values;
+    fm->fpga_values = alloc_shared_buffer(nchannels * fm->fsize, &values);
+    fm->values = values;
     return fm;
 }
 
@@ -144,13 +166,18 @@ void print_fm(fm_t* fm, int n){
 
 void free_conv(conv_t* conv){
     // free(conv->kernel);
-    clSVMFree(space->context, conv->kernel);
-    clSVMFree(space->context, conv->bias);
+    clEnqueueUnmapMemObject (space->queue, conv->fpga_kernel, conv->kernel, 0, NULL, NULL);
+    clEnqueueUnmapMemObject (space->queue, conv->fpga_bias, conv->bias, 0, NULL, NULL);
+    clReleaseMemObject (conv->fpga_kernel);
+    clReleaseMemObject (conv->fpga_bias);
     free(conv);
 }
 void free_dense(dense_t* dense){
     // free(dense->kernel);
-    clSVMFree(space->context, dense->kernel);
+    clEnqueueUnmapMemObject (space->queue, dense->fpga_kernel, dense->kernel, 0, NULL, NULL);
+    clEnqueueUnmapMemObject (space->queue, dense->fpga_bias, dense->bias, 0, NULL, NULL);
+    clReleaseMemObject (dense->fpga_kernel);
+    clReleaseMemObject (dense->fpga_bias);
     free(dense);
 }
 void free_bn(bn_t* bn){
@@ -158,5 +185,7 @@ void free_bn(bn_t* bn){
     free(bn);
 }
 void free_fm(fm_t* fm){
-    clSVMFree(space->context, fm->values); free(fm);
+    clEnqueueUnmapMemObject (space->queue, fm->fpga_values, fm->values, 0, NULL, NULL);
+    clReleaseMemObject (fm->fpga_values);
+    free(fm);
 }
