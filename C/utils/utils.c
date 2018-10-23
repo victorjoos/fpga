@@ -20,14 +20,10 @@ cl_mem alloc_shared_buffer (size_t size, float **host_ptr) {
   cl_mem device_ptr = clCreateBuffer(space->context, CL_MEM_ALLOC_HOST_PTR, sizeof(float) * size, NULL, &status);
   checkError(status, "Failed to create buffer");
   assert (host_ptr != NULL);
-  *host_ptr = (float*) clEnqueueMapBuffer(space->queue, device_ptr, CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(float) * size, 0, NULL, NULL, NULL);
+  *host_ptr = (float*) clEnqueueMapBuffer(space->queue, device_ptr, CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(float) * size, 0, NULL, NULL, &status);
+  checkError(status, "Failed to create shared pointer");
   assert (*host_ptr != NULL);
   return device_ptr;
-    // int act = space->act;
-    // space->act = (act+1)%NMB_FM;
-    // *host_ptr = space->fm_buffers[act];
-
-    // return space->fm_fpga_buffers[act];
 }
 
 /**
@@ -121,9 +117,18 @@ fm_t* alloc_fm(int nchannels, int fdim){
     fm->fdim = fdim; fm->fsize = fdim*fdim;
     fm->nchannels = nchannels;
 
-    float * values;
-    fm->fpga_values = alloc_shared_buffer(nchannels * fm->fsize, &values);
-    fm->values = values;
+    int act = 0;
+    for(;act<NMB_FM && space->taken[act];act++);
+    if(act>=NMB_FM) {
+        printf("No Memory left\n");
+        exit(-1);
+    }
+    space->taken[act] = 1;
+    fm->fpga_values = space->fm_fpga_buffers[act];
+    fm->values = space->fm_buffers[act];
+    fm->mem_buff_channel = act;
+
+
     return fm;
 }
 
@@ -185,7 +190,8 @@ void free_bn(bn_t* bn){
     free(bn);
 }
 void free_fm(fm_t* fm){
-    clEnqueueUnmapMemObject (space->queue, fm->fpga_values, fm->values, 0, NULL, NULL);
-    clReleaseMemObject (fm->fpga_values);
+    // clEnqueueUnmapMemObject (space->queue, fm->fpga_values, fm->values, 0, NULL, NULL);
+    // clReleaseMemObject (fm->fpga_values);
     free(fm);
+    space->taken[fm->mem_buff_channel] = 0;
 }

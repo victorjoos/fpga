@@ -75,28 +75,27 @@ int init_cl(char* file_name){
 
 	// Create fm-buffers
 	for (int i=0; i<NMB_FM; ++i) {
-		space->fm_fpga_buffers[i] = clCreateBuffer(space->context, CL_MEM_ALLOC_HOST_PTR, sizeof(float) * MAX_FM_SIZE, NULL, &ret);
+		space->fm_fpga_buffers[i] = clCreateBuffer(space->context, CL_MEM_ALLOC_HOST_PTR, 
+					sizeof(float) * MAX_FM_SIZE, NULL, &ret);
 		checkError(ret, "Failed to create buffer");
 		assert (space->fm_fpga_buffers[i] != NULL);
-		space->fm_buffers[i] = (float*) clEnqueueMapBuffer(space->queue, space->fm_fpga_buffers[i], CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(float) * MAX_FM_SIZE, 0, NULL, NULL, NULL);
+		space->fm_buffers[i] = (float*) clEnqueueMapBuffer(space->queue, space->fm_fpga_buffers[i], 
+					CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(float) * MAX_FM_SIZE, 0, NULL, NULL, &ret);
+		checkError(ret, "Failed to map shared memory");
 		assert (space->fm_buffers[i] != NULL);
+		space->taken[i] = 0;
 	}
-	space->act=0;
 
     return 1;
 }
 
 int load_kernel(char* kernel_name,
                     cl_kernel * kernel){
-    cl_int ret;
-    // Load the kernel source code into the array source_str
-    
+    cl_int ret; 
 
     // create kernel
     *kernel = clCreateKernel(space->program, kernel_name, &ret);
     checkError(ret, "Failed creating kernel");
-
-	
 
     return 1;
 }
@@ -117,38 +116,6 @@ void free_cl(cl_kernel * kernel){
 }
 
 
-cl_int cl_load_fm(fm_t* fm){
-    /*cl_int ret = clEnqueueWriteBuffer(space->queue, space->fm_in, CL_TRUE, 0,
-            fm->nchannels*fm->fsize * sizeof(float), fm->values, 0, NULL, NULL);*/
-	cl_int ret = clEnqueueSVMMap(space->queue, CL_TRUE, CL_MAP_READ, (void*) fm->values,
-		fm->nchannels*fm->fsize * sizeof(float), 0, NULL, NULL);
-    checkError(ret, "failed loading FMap");
-}
-
-void cl_load_conv(conv_t* conv){
-    /*cl_int ret = clEnqueueWriteBuffer(space->queue, space->conv_kernel, CL_TRUE, 0,
-            conv->size_in*conv->size_out*conv->xsize*conv->xsize * sizeof(float), 
-            conv->kernel, 0, NULL, NULL);*/
-	cl_int ret = clEnqueueSVMMap(space->queue, CL_TRUE, CL_MAP_READ, (void*) conv->kernel,
-		conv->size_in*conv->size_out*conv->xsize*conv->xsize * sizeof(float),
-		0, NULL, NULL);
-    checkError(ret, "failed loading conv kernel");
-    /*ret = clEnqueueWriteBuffer(space->queue, space->conv_bias, CL_TRUE, 0,
-            conv->size_out * sizeof(float), 
-            conv->bias, 0, NULL, NULL);*/
-	ret = clEnqueueSVMMap(space->queue, CL_TRUE, CL_MAP_READ, (void*) conv->bias,
-		conv->size_out * sizeof(float),
-		0, NULL, NULL);
-    checkError(ret, "failed loading bias");
-}
-
-void cl_read_fm(fm_t* fm){
-    /*cl_int ret = clEnqueueReadBuffer(space->queue, space->fm_out, CL_TRUE, 0,
-            fm->nchannels*fm->fsize * sizeof(float), fm->values, 0, NULL, NULL);*/
-	cl_int ret = clEnqueueSVMMap(space->queue, CL_TRUE, CL_MAP_READ, (void*) fm->values,
-		fm->nchannels*fm->fsize * sizeof(float), 0, NULL, NULL);
-    checkError(ret, "failed reading fm");
-}
 
 
 void printError(cl_int error) {

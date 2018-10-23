@@ -13,10 +13,6 @@ int load_kernel(char* kernel_name,
 void free_cl(cl_kernel * kernel);
 
 
-cl_int cl_load_fm(fm_t* fm);
-void cl_load_conv(conv_t* conv);
-void cl_read_fm(fm_t* fm);
-
 // Print errors from PipeCNN
 void printError(cl_int error);
 void _checkError(int line, 

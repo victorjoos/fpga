@@ -44,6 +44,7 @@ typedef struct feature_map{
     int nchannels;
     int fdim;
     int fsize; //= fdim*fdim
+    int mem_buff_channel;
 } fm_t;
 
 
