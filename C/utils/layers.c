@@ -10,12 +10,12 @@
 
 
 
-fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_kernel* kernel){
+fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_kernel* kernels){
     assert(conv->size_in == fm_in->nchannels);
     fm_t* fm_out = alloc_fm(conv->size_out, fm_in->fdim/strides);
 
     // set kernel arguments
-    cl_kernel _kernel =(strides==1 && conv->xsize==3)? kernel[1]: kernel[0];// (strides==1 && conv->xsize==3)? kernel3: 
+    cl_kernel _kernel = (strides==1 && conv->xsize==3)? kernels[1]: kernels[0];
 
     cl_int ret;
     ret = clSetKernelArg(_kernel, 0, sizeof(int),    (void *)&(conv->size_in));      checkError(ret, "Failed to set args");       
@@ -31,7 +31,7 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_kernel* kernel){
 
     // Execute the OpenCL kernel
     cl_event event;
-    if(strides==1 && conv->xsize==3){
+    if(_kernel == kernels[1]){
         size_t global_size[2] = {(size_t) fm_in->fdim, (size_t) fm_in->fdim};
         size_t local_size[2] = {(size_t) TILE_SIZE, (size_t) TILE_SIZE};
         ret = clEnqueueNDRangeKernel(space->queue, _kernel, 2, NULL,

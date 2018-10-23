@@ -66,7 +66,6 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
         unsigned char* img = get_image(imgi, imgs);
         unsigned char img_class = img[0];
         fm_t* fm = img_to_fm(img);
-        
         // First non-residual block
         fm_t* fm_prev = fm;
         activation_t act_type = TANH;
