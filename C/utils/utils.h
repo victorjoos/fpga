@@ -2,16 +2,22 @@
 #define __utility_opencl__ 1
 #define IMDIM 32
 #define IMCHANNEL 3
+#include "cl_space.h"
+#include <CL/opencl.h>
 
 // For the images
 unsigned char* read_images(char* filename);
 unsigned char* get_image(int number, unsigned char* dataset);
+
+extern cl_space_t *space;
 
 // For the layer's weights
 typedef enum layer {CONV, BN, DENSE} layer_t;
 typedef struct conv {
     float * kernel;
     float * bias;
+    cl_mem fpga_kernel;
+    cl_mem fpga_bias;
     int xsize;
     int size_in;
     int size_out;
@@ -20,6 +26,8 @@ typedef struct conv {
 typedef struct dense {
     float * kernel;
     float * bias;
+    cl_mem fpga_kernel;
+    cl_mem fpga_bias;
     int size_in;
     int size_out;
 } dense_t;
@@ -32,9 +40,11 @@ typedef struct bn {
 } bn_t;
 typedef struct feature_map{
     float * values;
+    cl_mem fpga_values;
     int nchannels;
     int fdim;
     int fsize; //= fdim*fdim
+    int mem_buff_channel;
 } fm_t;
 
 

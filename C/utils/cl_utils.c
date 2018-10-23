@@ -1,12 +1,13 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <CL/cl.h>
+#include <CL/opencl.h>
 #include "cl_utils.h"
 #include "utils.h"
+#include <assert.h>
 #define MAX_SOURCE_SIZE (0x100000)
 
-int init_cl(cl_space_t* space, char* file_name){
+int init_cl(char* file_name){
     
 
     // Get platform and device information
@@ -18,18 +19,34 @@ int init_cl(cl_space_t* space, char* file_name){
     ret = clGetDeviceIDs( platform_id, CL_DEVICE_TYPE_DEFAULT, 1,
             &device_id, &ret_num_devices);
 
+	size_t name_size;
+	ret = clGetPlatformInfo(platform_id, CL_PLATFORM_NAME, 0, NULL, &name_size);
+	char *name = malloc(name_size);
+	ret = clGetPlatformInfo(platform_id, CL_PLATFORM_NAME, name_size, name, NULL);
+	printf("platform: %s\n", name);
+	free(name);
+	clGetDeviceInfo(device_id, CL_DEVICE_NAME, 0, NULL, &name_size);
+	name = malloc(name_size);
+	clGetDeviceInfo(device_id, CL_DEVICE_NAME, name_size, name, NULL);
+	printf("device name: %s\n", name);
+	free(name);
     FILE *fp;
-    char *source_str;
+    unsigned char *source_str;
     size_t source_size;
 
-    fp = fopen(file_name, "r");
+    fp = fopen(file_name, "rb");
     if (!fp) {
         fprintf(stderr, "Failed to load kernel.\n");
         exit(1);
     }
-    source_str = (char*)malloc(MAX_SOURCE_SIZE);
-    source_size = fread( source_str, 1, MAX_SOURCE_SIZE, fp);
+	fseek(fp, 0, SEEK_END);
+  	source_size = ftell(fp);
+	rewind(fp);
+	printf("source size according to tell: %d\n", source_size);
+    source_str = (unsigned char*)malloc(source_size);
+    source_size = fread( source_str, 1, source_size, fp);
     fclose( fp );
+	printf("source size: %d\n", source_size);
 
     // Create an OpenCL context
     space->context = clCreateContext( NULL, 1, &device_id, NULL, NULL, &ret);
@@ -40,10 +57,14 @@ int init_cl(cl_space_t* space, char* file_name){
     checkError(ret, "Failed create command queue");
 
     // Create a program from the kernel source
+	#ifndef FPGA_BUILD 
     space->program = clCreateProgramWithSource(space->context, 1,
             (const char **)&source_str, (const size_t *)&source_size, &ret);
+	#else
+	space->program = clCreateProgramWithBinary(space->context, 1, &device_id,  (const size_t*) &source_size, (const unsigned char**) &source_str, NULL, &ret);
+	#endif
     checkError(ret, "Failed create program with source");
-    // Build the program
+	// Build the program
     ret = clBuildProgram(space->program, 1, &device_id, NULL, NULL, NULL);
     checkError(ret, "Failed build program");
     size_t len = 0;
@@ -51,61 +72,50 @@ int init_cl(cl_space_t* space, char* file_name){
     char *buffer = calloc(len, sizeof(char));
     ret = clGetProgramBuildInfo(space->program, device_id, CL_PROGRAM_BUILD_LOG, len, buffer, NULL);
     printf("%d\nHello : \n%s\n", ret, buffer);
+
+	// Create fm-buffers
+	for (int i=0; i<NMB_FM; ++i) {
+		space->fm_fpga_buffers[i] = clCreateBuffer(space->context, CL_MEM_ALLOC_HOST_PTR, 
+					sizeof(float) * MAX_FM_SIZE, NULL, &ret);
+		checkError(ret, "Failed to create buffer");
+		assert (space->fm_fpga_buffers[i] != NULL);
+		space->fm_buffers[i] = (float*) clEnqueueMapBuffer(space->queue, space->fm_fpga_buffers[i], 
+					CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(float) * MAX_FM_SIZE, 0, NULL, NULL, &ret);
+		checkError(ret, "Failed to map shared memory");
+		assert (space->fm_buffers[i] != NULL);
+		space->taken[i] = 0;
+	}
+
     return 1;
 }
 
 int load_kernel(char* kernel_name,
-                    cl_space_t * space,
                     cl_kernel * kernel){
-    cl_int ret;
-    // Load the kernel source code into the array source_str
-    
+    cl_int ret; 
 
     // create kernel
     *kernel = clCreateKernel(space->program, kernel_name, &ret);
     checkError(ret, "Failed creating kernel");
+
     return 1;
 }
 
-void free_cl(   cl_space_t* space,
-                cl_kernel * kernel
-                 ){
-    clReleaseMemObject(space->conv_kernel);
-    clReleaseMemObject(space->conv_bias);
-    clReleaseMemObject(space->fm_in);
-    clReleaseMemObject(space->fm_out);
+void free_cl(cl_kernel * kernels){
+    for (int i=0; i<NMB_FM; ++i) {
+		clReleaseMemObject(space->fm_fpga_buffers[i]);
+		clEnqueueUnmapMemObject (space->queue, space->fm_fpga_buffers[i], 
+					(void*)space->fm_buffers[i], 0, NULL, NULL);
+	}
     cl_int ret;
     ret = clFlush(space->queue);
     ret = clFinish(space->queue);
-    ret = clReleaseKernel(*kernel);
+    for(int i=0; i<2; ++i) clReleaseKernel(kernels[i]);
     ret = clReleaseProgram(space->program);
     ret = clReleaseCommandQueue(space->queue);
     ret = clReleaseContext(space->context);
 }
 
 
-cl_int cl_load_fm(fm_t* fm, cl_space_t* space){
-    cl_int ret = clEnqueueWriteBuffer(space->queue, space->fm_in, CL_TRUE, 0,
-            fm->nchannels*fm->fsize * sizeof(float), fm->values, 0, NULL, NULL);
-    checkError(ret, "failed loading FMap");
-}
-
-void cl_load_conv(conv_t* conv, cl_space_t* space){
-    cl_int ret = clEnqueueWriteBuffer(space->queue, space->conv_kernel, CL_TRUE, 0,
-            conv->size_in*conv->size_out*conv->xsize*conv->xsize * sizeof(float), 
-            conv->kernel, 0, NULL, NULL);
-    checkError(ret, "failed loading conv kernel");
-    ret = clEnqueueWriteBuffer(space->queue, space->conv_bias, CL_TRUE, 0,
-            conv->size_out * sizeof(float), 
-            conv->bias, 0, NULL, NULL);
-    checkError(ret, "failed loading bias");
-}
-
-void cl_read_fm(fm_t* fm, cl_space_t* space){
-    cl_int ret = clEnqueueReadBuffer(space->queue, space->fm_out, CL_TRUE, 0,
-            fm->nchannels*fm->fsize * sizeof(float), fm->values, 0, NULL, NULL);
-    checkError(ret, "failed reading fm");
-}
 
 
 void printError(cl_int error) {

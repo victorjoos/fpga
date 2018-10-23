@@ -1,12 +1,16 @@
 #ifndef __resnet_opencl__
 #define __resnet_opencl__ 1
 #include "layers.h"
+#include "cl_space.h"
+
 typedef struct resnet {
     int nblocks;
     conv_t** convs;
     dense_t** denses;
     bn_t** bns;
 } resnet_t;
+
+extern cl_space_t *space;
 
 resnet_t* build_resnet(int nblocks, char* dir);
 void free_resnet(resnet_t* resnet);

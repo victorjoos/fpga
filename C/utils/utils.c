@@ -1,6 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <assert.h>
 #include "utils.h"
+#include "cl_utils.h"
+#include "CL/cl.h"
 
 const int IMSIZE = IMDIM*IMDIM*IMCHANNEL;
 unsigned char* read_images(char* filename) {
@@ -10,6 +13,17 @@ unsigned char* read_images(char* filename) {
     fread(buffer, sizeof(unsigned char), filelen, fileptr);
     fclose(fileptr);
     return buffer;
+}
+
+cl_mem alloc_shared_buffer (size_t size, float **host_ptr) {
+  cl_int status;
+  cl_mem device_ptr = clCreateBuffer(space->context, CL_MEM_ALLOC_HOST_PTR, sizeof(float) * size, NULL, &status);
+  checkError(status, "Failed to create buffer");
+  assert (host_ptr != NULL);
+  *host_ptr = (float*) clEnqueueMapBuffer(space->queue, device_ptr, CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(float) * size, 0, NULL, NULL, &status);
+  checkError(status, "Failed to create shared pointer");
+  assert (*host_ptr != NULL);
+  return device_ptr;
 }
 
 /**
@@ -47,10 +61,14 @@ conv_t * read_conv(char* filename){
 
     // read remaining values
     int kernel_size = conv->xsize*conv->xsize*conv->size_in*conv->size_out;
-    float* values = (float*) malloc(sizeof(float) * (kernel_size + conv->size_out));
-    fread(values, sizeof(float), kernel_size+conv->size_out, fp);
+
+    float* values;
+    conv->fpga_kernel = alloc_shared_buffer(kernel_size, &values);
+    fread(values, sizeof(float), kernel_size, fp);
     conv->kernel = values;
-    conv->bias = values + kernel_size;
+    conv->fpga_bias = alloc_shared_buffer(conv->size_out, &values);
+    fread(values, sizeof(float), conv->size_out, fp);
+    conv->bias = values;
     fclose(fp);
     return conv;
 }
@@ -66,10 +84,13 @@ dense_t * read_dense(char* filename){
     
     // read remaining values
     int kernel_size = dense->size_in*dense->size_out;
-    float* values = (float*) malloc(sizeof(float) * (kernel_size + dense->size_out));
-    fread(values, sizeof(float), kernel_size+dense->size_out, fp);
+    float* values;
+    dense->fpga_kernel = alloc_shared_buffer(kernel_size, &values);
+    fread(values, sizeof(float), kernel_size, fp);
     dense->kernel = values;
-    dense->bias = values + kernel_size;
+    dense->fpga_bias = alloc_shared_buffer(dense->size_out, &values);
+    fread(values, sizeof(float), dense->size_out, fp);
+    dense->bias = values;
     fclose(fp);
     return dense;
 }
@@ -95,7 +116,19 @@ fm_t* alloc_fm(int nchannels, int fdim){
     fm_t* fm = (fm_t*) malloc(sizeof(fm_t));
     fm->fdim = fdim; fm->fsize = fdim*fdim;
     fm->nchannels = nchannels;
-    fm->values = (float*) malloc(sizeof(float) * nchannels*fm->fsize);
+
+    int act = 0;
+    for(;act<NMB_FM && space->taken[act];act++);
+    if(act>=NMB_FM) {
+        printf("No Memory left\n");
+        exit(-1);
+    }
+    space->taken[act] = 1;
+    fm->fpga_values = space->fm_fpga_buffers[act];
+    fm->values = space->fm_buffers[act];
+    fm->mem_buff_channel = act;
+
+
     return fm;
 }
 
@@ -137,11 +170,19 @@ void print_fm(fm_t* fm, int n){
 }
 
 void free_conv(conv_t* conv){
-    free(conv->kernel);
+    // free(conv->kernel);
+    clEnqueueUnmapMemObject (space->queue, conv->fpga_kernel, conv->kernel, 0, NULL, NULL);
+    clEnqueueUnmapMemObject (space->queue, conv->fpga_bias, conv->bias, 0, NULL, NULL);
+    clReleaseMemObject (conv->fpga_kernel);
+    clReleaseMemObject (conv->fpga_bias);
     free(conv);
 }
 void free_dense(dense_t* dense){
-    free(dense->kernel);
+    // free(dense->kernel);
+    clEnqueueUnmapMemObject (space->queue, dense->fpga_kernel, dense->kernel, 0, NULL, NULL);
+    clEnqueueUnmapMemObject (space->queue, dense->fpga_bias, dense->bias, 0, NULL, NULL);
+    clReleaseMemObject (dense->fpga_kernel);
+    clReleaseMemObject (dense->fpga_bias);
     free(dense);
 }
 void free_bn(bn_t* bn){
@@ -149,5 +190,8 @@ void free_bn(bn_t* bn){
     free(bn);
 }
 void free_fm(fm_t* fm){
-    free(fm->values); free(fm);
+    // clEnqueueUnmapMemObject (space->queue, fm->fpga_values, fm->values, 0, NULL, NULL);
+    // clReleaseMemObject (fm->fpga_values);
+    free(fm);
+    space->taken[fm->mem_buff_channel] = 0;
 }
