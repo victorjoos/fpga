@@ -73,9 +73,9 @@ __kernel void pe_tile_ff( const int conv_size_in, const int conv_size_out,
 
     const int local_i = get_local_id(0);
     const int local_j = get_local_id(1);
-    const int global_i = TILE_SIZE*2*get_group_id(0) + local_i;
-    const int global_i2 = TILE_SIZE*(2*get_group_id(0)+1) + local_i;
-    const int global_j = TILE_SIZE*get_group_id(1)+ local_j;
+    const int global_i = TILE_SIZE*get_group_id(0) + local_i;
+    const int global_j = TILE_SIZE*2*get_group_id(1)+ local_j;
+    const int global_j2 = TILE_SIZE*(2*get_group_id(1)+1) + local_j;
 
     __local float fm_in_local[TILE_SIZE+2][TILE_SIZE+2];
     __local float kern_in_local[3][3];
@@ -94,8 +94,8 @@ __kernel void pe_tile_ff( const int conv_size_in, const int conv_size_out,
                 barrier(CLK_LOCAL_MEM_FENCE);
                 for(int shift=0; shift<2; ++shift){
                     // Load into shared memory
-                    int ii = TILE_SIZE*(2*get_group_id(0)+shift) + 2*local_i - 1;
-                    int jj = TILE_SIZE*get_group_id(1) + 2*local_j - 1;
+                    int ii = TILE_SIZE*get_group_id(0) + 2*local_i - 1;
+                    int jj = TILE_SIZE*(2*get_group_id(1)+shift) + 2*local_j - 1;
                     for(int li=0; li<2; ++li){
                         for(int lj=0; lj<2; ++lj){
                             if(2*local_i+li>=TILE_SIZE+2) continue;
@@ -124,7 +124,7 @@ __kernel void pe_tile_ff( const int conv_size_in, const int conv_size_out,
             acc[0] += conv_bias[outf];
             acc[1] += conv_bias[outf];
             fm_out[outf*fsize_out + global_i*fdim_out + global_j] = acc[0];
-            fm_out[outf*fsize_out + global_i2*fdim_out + global_j] = acc[1];
+            fm_out[outf*fsize_out + global_i*fdim_out + global_j2] = acc[1];
         }
 }
 

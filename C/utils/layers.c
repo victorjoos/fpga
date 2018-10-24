@@ -32,7 +32,7 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_kernel* kernels){
     // Execute the OpenCL kernel
     cl_event event;
     if(_kernel == kernels[1]){
-        size_t global_size[2] = {(size_t) fm_in->fdim/2, (size_t) fm_in->fdim};
+        size_t global_size[2] = {(size_t) fm_in->fdim, (size_t) fm_in->fdim/2};
         size_t local_size[2] = {(size_t) TILE_SIZE, (size_t) TILE_SIZE};
         ret = clEnqueueNDRangeKernel(space->queue, _kernel, 2, NULL,
                 global_size, local_size, 0, NULL, &event);
