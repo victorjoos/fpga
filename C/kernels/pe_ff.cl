@@ -55,6 +55,8 @@ __kernel void pe_ff( const int conv_size_in, const int conv_size_out,
     }
 }
 
+#define KSIZE 3
+#define LSIZE 3
 __kernel void pe_tile_ff( const int conv_size_in, const int conv_size_out,
                 const int ksize, const int strides, 
                 const int fdim_in, const int fdim_out,
@@ -64,8 +66,8 @@ __kernel void pe_tile_ff( const int conv_size_in, const int conv_size_out,
     // conv consts
     const int zsize = conv_size_out;
     const int ysize = zsize*conv_size_in;
-    const int xsize = ysize*ksize;         // TODO: avoid multiplication in kernel
-    const int offset = ksize/2;
+    const int xsize = ysize*KSIZE;         // TODO: avoid multiplication in kernel
+    const int offset = 1;
     
     // fm consts
     const int fsize_in = fdim_in*fdim_in; // TODO: avoid multiplication in kernel
@@ -73,58 +75,62 @@ __kernel void pe_tile_ff( const int conv_size_in, const int conv_size_out,
 
     const int local_i = get_local_id(0);
     const int local_j = get_local_id(1);
-    const int global_i = TILE_SIZE*get_group_id(0) + local_i;
+    const int global_i = TILE_SIZE*2*get_group_id(0) + local_i;
+    const int global_i2 = TILE_SIZE*(2*get_group_id(0)+1) + local_i;
     const int global_j = TILE_SIZE*2*get_group_id(1)+ local_j;
     const int global_j2 = TILE_SIZE*(2*get_group_id(1)+1) + local_j;
 
-    __local float fm_in_local[TILE_SIZE+2][TILE_SIZE+2];
+    __local float fm_in_local[2*TILE_SIZE+2][2*TILE_SIZE+2];
     __local float kern_in_local[3][3];
-    float acc[2];
+    float acc[2][2];
 
-    const int n_tiles = conv_size_out/TILE_SIZE;
     for(int outf=0; outf<conv_size_out; ++outf){
-            acc[0] = 0.0f;
-            acc[1] = 0.0f;
+            acc[0][0] = 0.0f; acc[1][0] = 0.0f;
+            acc[0][1] = 0.0f; acc[1][1] = 0.0f;
             for(int inf=0; inf<conv_size_in; ++inf){
-                if(local_i<3 && local_j<3){ //TODO: make independent from TILE_SIZE
+                if(local_i<3 && local_j<3){
                     int k = local_i;
                     int l = local_j;
                     kern_in_local[k][l] = conv_kernel[k*xsize + l*ysize + inf*zsize + outf];
                 }
-                barrier(CLK_LOCAL_MEM_FENCE);
-                for(int shift=0; shift<2; ++shift){
-                    // Load into shared memory
-                    int ii = TILE_SIZE*get_group_id(0) + 2*local_i - 1;
-                    int jj = TILE_SIZE*(2*get_group_id(1)+shift) + 2*local_j - 1;
-                    for(int li=0; li<2; ++li){
-                        for(int lj=0; lj<2; ++lj){
-                            if(2*local_i+li>=TILE_SIZE+2) continue;
-                            if(2*local_j+lj>=TILE_SIZE+2) continue;
+                // Load into shared memory
+                int ii = TILE_SIZE*2*get_group_id(0) + LSIZE*local_i - 1;
+                int jj = TILE_SIZE*2*get_group_id(1) + LSIZE*local_j - 1;
+                for(int li=0; li<LSIZE; ++li){
+                    for(int lj=0; lj<LSIZE; ++lj){
+                        if(LSIZE*local_i+li>=2*TILE_SIZE+2) continue;
+                        if(LSIZE*local_j+lj>=2*TILE_SIZE+2) continue;
 
-                            float fm_elem;
-                            if((ii+li<0)||(jj+lj<0)||(ii+li>=fdim_in)||(jj+lj>=fdim_in)) fm_elem = 0.0f;
-                            else fm_elem = fm_in[inf*fsize_in + (ii+li)*fdim_in + (jj+lj)];
-                            fm_in_local[2*local_i+li][2*local_j+lj] = fm_elem;
-                        }
+                        float fm_elem;
+                        if((ii+li<0)||(jj+lj<0)||(ii+li>=fdim_in)||(jj+lj>=fdim_in)) fm_elem = 0.0f;
+                        else fm_elem = fm_in[inf*fsize_in + (ii+li)*fdim_in + (jj+lj)];
+                        fm_in_local[LSIZE*local_i+li][LSIZE*local_j+lj] = fm_elem;
                     }
-                    barrier(CLK_LOCAL_MEM_FENCE);
-                    float _acc = 0.0f;
-                    int i = local_i; int j = local_j;
-                    for(int k=0; k<3; ++k){
-                        for(int l=0; l<3; ++l){
-                            float fm_elem = fm_in_local[i+k][j+l];                                              
-                            _acc += kern_in_local[k][l] * fm_elem;
-                        }
-                    }
-                    acc[shift] += _acc;
-                    barrier(CLK_LOCAL_MEM_FENCE);
                 }
+                barrier(CLK_LOCAL_MEM_FENCE);
+                for(int si=0; si<2; ++si){
+                    for(int sj=0; sj<2; ++sj){
+                        float _acc = 0.0f;
+                        int i = TILE_SIZE*si+local_i; int j = TILE_SIZE*sj+local_j;
+                        for(int k=0; k<3; ++k){
+                            for(int l=0; l<3; ++l){
+                                float fm_elem = fm_in_local[i+k][j+l];                                              
+                                _acc += kern_in_local[k][l] * fm_elem;
+                            }
+                        }
+                        acc[si][sj] += _acc;
+                    }
+                }
+                barrier(CLK_LOCAL_MEM_FENCE);
             }
             // if(outf==0) printf("%.3f, %.3f\n", acc[0], acc[1]);
-            acc[0] += conv_bias[outf];
-            acc[1] += conv_bias[outf];
-            fm_out[outf*fsize_out + global_i*fdim_out + global_j] = acc[0];
-            fm_out[outf*fsize_out + global_i*fdim_out + global_j2] = acc[1];
+            float cbout = conv_bias[outf];
+            acc[0][0] += cbout; acc[1][0] += cbout;
+            acc[0][1] += cbout; acc[1][1] += cbout;
+            fm_out[outf*fsize_out + global_i*fdim_out + global_j]   = acc[0][0];
+            fm_out[outf*fsize_out + global_i*fdim_out + global_j2]  = acc[0][1];
+            fm_out[outf*fsize_out + global_i2*fdim_out + global_j]  = acc[1][0];
+            fm_out[outf*fsize_out + global_i2*fdim_out + global_j2] = acc[1][1];
         }
 }
 
