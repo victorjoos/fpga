@@ -66,9 +66,6 @@ conv_t * read_conv(char* filename){
     conv->fpga_kernel = alloc_shared_buffer(kernel_size, &values);
     fread(values, sizeof(float), kernel_size, fp);
     conv->kernel = values;
-    conv->fpga_bias = alloc_shared_buffer(conv->size_out, &values);
-    fread(values, sizeof(float), conv->size_out, fp);
-    conv->bias = values;
     fclose(fp);
     return conv;
 }
@@ -88,9 +85,6 @@ dense_t * read_dense(char* filename){
     dense->fpga_kernel = alloc_shared_buffer(kernel_size, &values);
     fread(values, sizeof(float), kernel_size, fp);
     dense->kernel = values;
-    dense->fpga_bias = alloc_shared_buffer(dense->size_out, &values);
-    fread(values, sizeof(float), dense->size_out, fp);
-    dense->bias = values;
     fclose(fp);
     return dense;
 }
@@ -172,17 +166,13 @@ void print_fm(fm_t* fm, int n){
 void free_conv(conv_t* conv){
     // free(conv->kernel);
     clEnqueueUnmapMemObject (space->queue, conv->fpga_kernel, conv->kernel, 0, NULL, NULL);
-    clEnqueueUnmapMemObject (space->queue, conv->fpga_bias, conv->bias, 0, NULL, NULL);
     clReleaseMemObject (conv->fpga_kernel);
-    clReleaseMemObject (conv->fpga_bias);
     free(conv);
 }
 void free_dense(dense_t* dense){
     // free(dense->kernel);
     clEnqueueUnmapMemObject (space->queue, dense->fpga_kernel, dense->kernel, 0, NULL, NULL);
-    clEnqueueUnmapMemObject (space->queue, dense->fpga_bias, dense->bias, 0, NULL, NULL);
     clReleaseMemObject (dense->fpga_kernel);
-    clReleaseMemObject (dense->fpga_bias);
     free(dense);
 }
 void free_bn(bn_t* bn){

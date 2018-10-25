@@ -25,9 +25,8 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_kernel* kernels){
     ret = clSetKernelArg(_kernel, 4, sizeof(int),    (void *)&(fm_in->fdim));        checkError(ret, "Failed to set args");     
     ret = clSetKernelArg(_kernel, 5, sizeof(int),    (void *)&(fm_out->fdim));       checkError(ret, "Failed to set args");      
     ret = clSetKernelArg(_kernel, 6, sizeof(cl_mem), (void *)&(conv->fpga_kernel));  checkError(ret, "Failed to set args");           
-    ret = clSetKernelArg(_kernel, 7, sizeof(cl_mem), (void *)&(conv->fpga_bias));    checkError(ret, "Failed to set args");         
-    ret = clSetKernelArg(_kernel, 8, sizeof(cl_mem), (void *)&(fm_in->fpga_values)); checkError(ret, "Failed to set args");            
-    ret = clSetKernelArg(_kernel, 9, sizeof(cl_mem), (void *)&(fm_out->fpga_values));checkError(ret, "Failed to set args");             
+    ret = clSetKernelArg(_kernel, 7, sizeof(cl_mem), (void *)&(fm_in->fpga_values)); checkError(ret, "Failed to set args");            
+    ret = clSetKernelArg(_kernel, 8, sizeof(cl_mem), (void *)&(fm_out->fpga_values));checkError(ret, "Failed to set args");             
 
     // Execute the OpenCL kernel
     cl_event event;
@@ -62,7 +61,6 @@ fm_t* fully_connect(dense_t* dense, fm_t* fm_in){
                     acc += get_dense_elem(dense, inf, outf)*
                         get_fm_elem(fm_in, inf, i, j);
                 }
-                acc += dense->bias[outf];
                 set_fm_elem(fm_out, acc, outf, i, j);
             }
         }
