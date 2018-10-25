@@ -15,9 +15,7 @@ extern cl_space_t *space;
 typedef enum layer {CONV, BN, DENSE} layer_t;
 typedef struct conv {
     float * kernel;
-    float * bias;
     cl_mem fpga_kernel;
-    cl_mem fpga_bias;
     int xsize;
     int size_in;
     int size_out;
@@ -25,9 +23,7 @@ typedef struct conv {
 
 typedef struct dense {
     float * kernel;
-    float * bias;
     cl_mem fpga_kernel;
-    cl_mem fpga_bias;
     int size_in;
     int size_out;
 } dense_t;

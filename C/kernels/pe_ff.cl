@@ -20,7 +20,7 @@ void print_fm_test(__global const float* fm, int fdim, int fsize){
 __kernel void pe_ff( const int conv_size_in, const int conv_size_out,
                 const int ksize, const int strides, 
                 const int fdim_in, const int fdim_out,
-                __global const float* conv_kernel, __global const float* conv_bias,
+                __global const float* conv_kernel,
                 __global const float* fm_in, __global float* fm_out){
     const int outf = get_global_id(0);
     // printf("hello from conv\n");
@@ -49,7 +49,6 @@ __kernel void pe_ff( const int conv_size_in, const int conv_size_out,
                     }
                 }
             }
-            acc += conv_bias[outf];
             fm_out[outf*fsize_out + _i/strides*fdim_out + _j/strides] = acc;
         }
     }
@@ -58,7 +57,7 @@ __kernel void pe_ff( const int conv_size_in, const int conv_size_out,
 __kernel void pe_tile_ff( const int conv_size_in, const int conv_size_out,
                 const int ksize, const int strides, 
                 const int fdim_in, const int fdim_out,
-                __global const float* conv_kernel, __global const float* conv_bias,
+                __global const float* conv_kernel,
                 __global const float* fm_in, __global float* fm_out){
 
     // conv consts
@@ -113,7 +112,6 @@ __kernel void pe_tile_ff( const int conv_size_in, const int conv_size_out,
                 }
                 barrier(CLK_LOCAL_MEM_FENCE);
             }
-            acc += conv_bias[outf];
             fm_out[outf*fsize_out + global_i*fdim_out + global_j] = acc;
         }
 }
