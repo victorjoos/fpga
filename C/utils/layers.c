@@ -15,7 +15,7 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_kernel* kernels){
     fm_t* fm_out = alloc_fm(conv->size_out, fm_in->fdim/strides);
 
     // set kernel arguments
-    cl_kernel _kernel = (strides==1 && conv->xsize==3)? kernels[1]: kernels[0];
+    cl_kernel _kernel = (strides==1 && conv->xsize==3)? kernels[0]: kernels[0];
 
     cl_int ret;
     ret = clSetKernelArg(_kernel, 0, sizeof(int),    (void *)&(conv->size_in));      checkError(ret, "Failed to set args");       
