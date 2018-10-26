@@ -15,7 +15,117 @@ void print_fm_test(__global const float* fm, int fdim, int fsize){
             printf("\n");
         }
 }*/
+#define TILE_SIZE 4 // tile size + 2
+#define KERNEL_SIZE 3
+#define NUM_LANES 4
+#define MASK_WEIGHT 0xffffffff
+#define MASK_ACT 0xffffffff
 
+typedef int8 data_t;
+
+typedef struct {
+    data_t data[KERNEL_SIZE][KERNEL_SIZE]
+} vec_weight_t;
+
+typedef struct {
+    data_t data[TILE_SIZE+2]
+} vec_fmap_t;
+
+typedef struct {
+    vec_weight_t lane[NUM_LANES]
+} vec_w_lane_t;
+
+typedef struct {
+    vec_fmap_t lane[NUM_LANES]
+} vec_fmap_lane_t
+
+typedef struct {
+    mac_t lane[NUM_LANES]
+} lane_t
+
+channel vec_fmap_t fmap_channel;
+channel vec_weight_t weight_channel;
+channel mac_t conv_channel;
+channel mac_t bn_channel;
+channel vec_fmap_t act_channel;
+
+
+
+// #define PATCH_SIZE 6
+__kernel void load_mem(const int conv_size_in, const int conv_size_out,
+                        const int fdim_in, const fdim_out,
+                        const int ksize,
+                        __global const float* conv_kernel,
+                        __global const float* fm_in) {
+    
+    const int zsize = conv_size_out;
+    const int ysize = zsize*conv_size_in;
+    const int xsize = ysize*ksize;         // TODO: avoid multiplication in kernel
+    const int offset = ksize/2;
+    
+    __local vec_fmap_t fmap_line;
+    __local vec_weight_t weights; // turn to vector of NUM_LANES
+    for(int outf=0; outf<conv_size_out; ++outf) {/* Loop over all output fmaps */
+        for(int inf=0; outf<conv_size_in; ++inf) {
+            /* Send one kernel */
+            for (int k=0; k<ksize; ++k) {
+                for (int l=0; l<ksize; ++l) {
+                    weights[k][l] = conv_kernel[k*xsize + l*ysize + inf*conv_size_out + outf];
+                }
+            }
+            write_channel_intel(weight_channel, weights);
+
+            for (int ii=-offset; ii<fdim_in+1;++ii) {
+                for (int jj=-offset; jj<fdim_in+1; jj+=ksize) {
+                    for (int kk=0; kk<ksize; ++kk) {
+                        mac_t fm_elem;
+                        if ((ii<0) || (jj+kk<0) || (ii>=fdim_in) || (jj+kk>=fdim_in)) fm_elem = 0;
+                        else fm_elem = fm_in[inf*fsize_in + ii*fdim_in + (jj+kk)];
+                        fmap_line[kk] = fm_elem;
+                    }
+                    write_channel_intel(fmap_channel, fmap_line);
+                }
+            }
+        }
+    }
+}
+
+__kernel void pe_ff_pipe(const int conv_size_in, const int conv_size_out,
+                        const int fdim_in, const fdim_out,
+                        const int ksize) {
+    
+
+    __local vec_weight_t fmap_tile;
+    __local vec_weight_t weights;
+    for(int outf=0; outf<conv_size_out; ++outf) {/* Loop over all output fmaps */
+        for(int inf=0; outf<conv_size_in; ++inf) {
+            weights = read_channel_intel(weight_channel);
+            for (int ii=0; ii<fdim_in; ++ii) {
+                /* load first elements from channel */
+                int first_elem=0;
+                for (int kk=0; kk<ksize-1; ++kk) {
+                    fmap_tile[first_elem] = read_channel_intel(fmap_channel);
+                    first_elem++;
+                }
+                for (int jj=0; kk<fdim_in; ++jj) {
+                    fmap_tile[first_elem] = read_channel_intel(fmap_channel);
+                    first_elem++;
+                    if (first_elem == ksize) first_elem = 0; /* FPGA doesn't like modulo */
+
+                    mac_t acc = 0;
+                    for (int _ki=0; ki<ksize; ki++) {
+                        ki = _ki+first_elem >= ksize ? _ki-ksize : _ki; /* Still no modulo */
+                        for (int kj=0; kj<ksize; kj++) {
+                            acc += weights[_ki][kj] * fmap_tile[ki][kj];
+                        }
+                    }
+                    write_channel_intel(conv_channel, acc);
+                }
+            }
+        }
+    }
+
+}
 
 __kernel void pe_ff( const int conv_size_in, const int conv_size_out,
                 const int ksize, const int strides, 
