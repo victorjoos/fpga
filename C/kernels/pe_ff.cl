@@ -66,7 +66,7 @@ __kernel void load_mem(const int conv_size_in, const int conv_size_out,
     __local vec_fmap_t fmap_line;
     __local vec_weight_t weights; // turn to vector of NUM_LANES
     for(int outf=0; outf<conv_size_out; ++outf) {/* Loop over all output fmaps */
-        for(int inf=0; outf<conv_size_in; ++inf) {
+        for(int inf=0; inf<conv_size_in; ++inf) {
             /* Send one kernel */
             for (int k=0; k<ksize; ++k) {
                 for (int l=0; l<ksize; ++l) {
@@ -98,25 +98,22 @@ __kernel void pe_ff_pipe(const int conv_size_in, const int conv_size_out,
     __local vec_weight_t fmap_tile;
     __local vec_weight_t weights;
     for(int outf=0; outf<conv_size_out; ++outf) {/* Loop over all output fmaps */
-        for(int inf=0; outf<conv_size_in; ++inf) {
+        for(int inf=0; inf<conv_size_in; ++inf) {
             weights = read_channel_intel(weight_channel);
             for (int ii=0; ii<fdim_in; ++ii) {
                 /* load first elements from channel */
-                int first_elem=0;
-                for (int kk=0; kk<ksize-1; ++kk) {
-                    fmap_tile[first_elem] = read_channel_intel(fmap_channel);
-                    first_elem++;
+                for (int kk=1; kk<ksize; ++kk) {
+                    fmap_tile[kk] = read_channel_intel(fmap_channel);
                 }
                 for (int jj=0; kk<fdim_in; ++jj) {
-                    fmap_tile[first_elem] = read_channel_intel(fmap_channel);
-                    first_elem++;
-                    if (first_elem == ksize) first_elem = 0; /* FPGA doesn't like modulo */
-
+                    fmap_tile[0] = fmap_tile[1];
+                    fmap_tile[1] = fmap_tile[2];
+                    fmap_tile[2] = read_channel_intel(fmap_channel);
+                    
                     mac_t acc = 0;
-                    for (int _ki=0; ki<ksize; ki++) {
-                        ki = _ki+first_elem >= ksize ? _ki-ksize : _ki; /* Still no modulo */
+                    for (int ki=0; ki<ksize; ki++) {
                         for (int kj=0; kj<ksize; kj++) {
-                            acc += weights[_ki][kj] * fmap_tile[ki][kj];
+                            acc += weights[ki][kj] * fmap_tile[ki][kj];
                         }
                     }
                     write_channel_intel(conv_channel, acc);
@@ -124,7 +121,29 @@ __kernel void pe_ff_pipe(const int conv_size_in, const int conv_size_out,
             }
         }
     }
+}
 
+__kernel void mem_write(const int conv_size_in, const int conv_size_out,
+                        const int fdim_in, const int fdim_out
+                        __global mac_t* restrict fm_out) {
+    const int fsize_out = fdim_out * fdim_out;
+    
+    __local mac_t out[fdim_in][fdim_in];
+
+    for (int outf=0; outf<conv_size_out; ++outf) {
+        for (int inf=0; inf<conv_size_in; ++inf) {
+            for (int ii=0; ii<fdim_in; ++ii) {
+                for (int jj=0; jj<fdim_in; ++jj) {
+                    if (inf+1 == conv_size_in) {
+                        fm_out[outf*fsize_out + ii*fdim_out + jj] = out[ii][jj] + read_channel_intel(conv_channel);
+                        out[ii][jj] = 0;
+                    } else {
+                        out[ii][jj] += read_channel_intel(conv_channel);
+                    }
+                }
+            }
+        }
+    }
 }
 
 __kernel void pe_ff( const int conv_size_in, const int conv_size_out,
