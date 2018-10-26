@@ -2,7 +2,9 @@ venv/
 .vscode
 # Prerequisites
 *.d
-
+*.gz
+*.bmp
+*.pdf
 # Object files
 *.o
 *.ko

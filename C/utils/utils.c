@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include "utils.h"
+#include "activations.h"
 #include "cl_utils.h"
 #include "CL/cl.h"
 
@@ -64,7 +65,9 @@ conv_t * read_conv(char* filename){
 
     float* values;
     conv->fpga_kernel = alloc_shared_buffer(kernel_size, &values);
+
     fread(values, sizeof(float), kernel_size, fp);
+    for(int i=0; i<kernel_size; ++i) values[i] = bin_htanh(values[i]);    
     conv->kernel = values;
     fclose(fp);
     return conv;
@@ -83,7 +86,9 @@ dense_t * read_dense(char* filename){
     int kernel_size = dense->size_in*dense->size_out;
     float* values;
     dense->fpga_kernel = alloc_shared_buffer(kernel_size, &values);
+
     fread(values, sizeof(float), kernel_size, fp);
+    for(int i=0; i<kernel_size; ++i) values[i] = bin_htanh(values[i]);        
     dense->kernel = values;
     fclose(fp);
     return dense;

@@ -86,14 +86,15 @@ def main(file):
         for y in group:
             print(y)
             if "batch_normalization" in y:
-                match = re.match(r'batch_normalization_(\d*)', y)
+                match = re.match(r'(?:.*)batch_normalization_(\d*)', y)
                 write_bn(d, int(match.groups()[0]), group[y])
             elif "conv2d" in y:
-                match = re.match(r'conv2d_(\d*)', y)
+                match = re.match(r'(?:.*)conv2d_(\d*)', y)
                 write_conv(d, int(match.groups()[0]), group[y])
             elif "dense" in y:
-                match = re.match(r'dense_(\d*)', y)
-                write_dense(d, int(match.groups()[0]), group[y])
+                match = re.match(r'(?:.*)dense_(\d*)', y)
+                # write_dense(d, int(match.groups()[0]), group[y])
+                write_dense(d, 1, group[y])
 
 
 if __name__ == "__main__":
