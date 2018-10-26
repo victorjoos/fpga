@@ -15,7 +15,9 @@ void print_fm_test(__global const float* fm, int fdim, int fsize){
             printf("\n");
         }
 }*/
-#define TILE_SIZE 4 // tile size + 2
+#pragma OPENCL EXTENSION cl_intel_channels : enable
+
+#define TILE_SIZE 1
 #define KERNEL_SIZE 3
 #define NUM_LANES 4
 #define MASK_WEIGHT 0xffffffff
@@ -24,44 +26,45 @@ void print_fm_test(__global const float* fm, int fdim, int fsize){
 typedef int8 data_t;
 
 typedef struct {
-    data_t data[KERNEL_SIZE][KERNEL_SIZE]
+    data_t data[KERNEL_SIZE][KERNEL_SIZE];
 } vec_weight_t;
 
 typedef struct {
-    data_t data[TILE_SIZE+2]
+    data_t data[TILE_SIZE+2];
 } vec_fmap_t;
 
 typedef struct {
-    vec_weight_t lane[NUM_LANES]
+    vec_weight_t lane[NUM_LANES];
 } vec_w_lane_t;
 
 typedef struct {
-    vec_fmap_t lane[NUM_LANES]
-} vec_fmap_lane_t
+    vec_fmap_t lane[NUM_LANES];
+} vec_fmap_lane_t;
 
 typedef struct {
-    mac_t lane[NUM_LANES]
-} lane_t
+    data_t lane[NUM_LANES];
+} lane_t;
 
 channel vec_fmap_t fmap_channel;
 channel vec_weight_t weight_channel;
-channel mac_t conv_channel;
-channel mac_t bn_channel;
+channel data_t conv_channel;
+channel data_t bn_channel;
 channel vec_fmap_t act_channel;
 
 
 
 // #define PATCH_SIZE 6
 __kernel void load_mem(const int conv_size_in, const int conv_size_out,
-                        const int fdim_in, const fdim_out,
+                        const int fdim_in, const int fdim_out,
                         const int ksize,
-                        __global const float* conv_kernel,
-                        __global const float* fm_in) {
+                        __global const float* restrict conv_kernel,
+                        __global const float* restrict fm_in) {
     
     const int zsize = conv_size_out;
     const int ysize = zsize*conv_size_in;
     const int xsize = ysize*ksize;         // TODO: avoid multiplication in kernel
     const int offset = ksize/2;
+    const int fsize_in = fdim_in * fdim_in;
     
     __local vec_fmap_t fmap_line;
     __local vec_weight_t weights; // turn to vector of NUM_LANES
@@ -70,7 +73,7 @@ __kernel void load_mem(const int conv_size_in, const int conv_size_out,
             /* Send one kernel */
             for (int k=0; k<ksize; ++k) {
                 for (int l=0; l<ksize; ++l) {
-                    weights[k][l] = conv_kernel[k*xsize + l*ysize + inf*conv_size_out + outf];
+                    weights.data[k][l] = conv_kernel[k*xsize + l*ysize + inf*conv_size_out + outf];
                 }
             }
             write_channel_intel(weight_channel, weights);
@@ -78,10 +81,10 @@ __kernel void load_mem(const int conv_size_in, const int conv_size_out,
             for (int ii=-offset; ii<fdim_in+1;++ii) {
                 for (int jj=-offset; jj<fdim_in+1; jj+=ksize) {
                     for (int kk=0; kk<ksize; ++kk) {
-                        mac_t fm_elem;
+                        data_t fm_elem;
                         if ((ii<0) || (jj+kk<0) || (ii>=fdim_in) || (jj+kk>=fdim_in)) fm_elem = 0;
                         else fm_elem = fm_in[inf*fsize_in + ii*fdim_in + (jj+kk)];
-                        fmap_line[kk] = fm_elem;
+                        fmap_line.data[kk] = fm_elem;
                     }
                     write_channel_intel(fmap_channel, fmap_line);
                 }
@@ -91,7 +94,7 @@ __kernel void load_mem(const int conv_size_in, const int conv_size_out,
 }
 
 __kernel void pe_ff_pipe(const int conv_size_in, const int conv_size_out,
-                        const int fdim_in, const fdim_out,
+                        const int fdim_in, const int fdim_out,
                         const int ksize) {
     
 
@@ -103,17 +106,23 @@ __kernel void pe_ff_pipe(const int conv_size_in, const int conv_size_out,
             for (int ii=0; ii<fdim_in; ++ii) {
                 /* load first elements from channel */
                 for (int kk=1; kk<ksize; ++kk) {
-                    fmap_tile[kk] = read_channel_intel(fmap_channel);
+                    vec_fmap_t in_channel = read_channel_intel(fmap_channel);
+                    for (int i=0; i<TILE_SIZE+2; ++i) {
+                        fmap_tile.data[kk][i] = in_channel.data[i];
+                    }
                 }
-                for (int jj=0; kk<fdim_in; ++jj) {
-                    fmap_tile[0] = fmap_tile[1];
-                    fmap_tile[1] = fmap_tile[2];
-                    fmap_tile[2] = read_channel_intel(fmap_channel);
+                for (int jj=0; jj<fdim_in; ++jj) {
+                    vec_fmap_t temp = read_channel_intel(fmap_channel);
+                    for (int i=0; i<TILE_SIZE+2; ++i) {
+                        fmap_tile.data[0][i] = fmap_tile.data[1][i];
+                        fmap_tile.data[1][i] = fmap_tile.data[2][i];
+                        fmap_tile.data[2][i] = temp.data[i];
+                    }
                     
-                    mac_t acc = 0;
+                    data_t acc = 0;
                     for (int ki=0; ki<ksize; ki++) {
                         for (int kj=0; kj<ksize; kj++) {
-                            acc += weights[ki][kj] * fmap_tile[ki][kj];
+                            acc += weights.data[ki][kj] * fmap_tile.data[ki][kj];
                         }
                     }
                     write_channel_intel(conv_channel, acc);
@@ -124,11 +133,11 @@ __kernel void pe_ff_pipe(const int conv_size_in, const int conv_size_out,
 }
 
 __kernel void mem_write(const int conv_size_in, const int conv_size_out,
-                        const int fdim_in, const int fdim_out
-                        __global mac_t* restrict fm_out) {
+                        const int fdim_in, const int fdim_out,
+                        __global data_t* restrict fm_out) {
     const int fsize_out = fdim_out * fdim_out;
     
-    __local mac_t out[fdim_in][fdim_in];
+    __local data_t out[64][64];
 
     for (int outf=0; outf<conv_size_out; ++outf) {
         for (int inf=0; inf<conv_size_in; ++inf) {
@@ -183,6 +192,7 @@ __kernel void pe_ff( const int conv_size_in, const int conv_size_out,
     }
 }
 
+/*
 __kernel void pe_tile_ff( const int conv_size_in, const int conv_size_out,
                 const int ksize, const int strides, 
                 const int fdim_in, const int fdim_out,
@@ -244,4 +254,4 @@ __kernel void pe_tile_ff( const int conv_size_in, const int conv_size_out,
             fm_out[outf*fsize_out + global_i*fdim_out + global_j] = acc;
         }
 }
-
+*/
