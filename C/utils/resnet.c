@@ -56,9 +56,12 @@ resnet_t* build_resnet(int nblocks, char* dir){
 
 double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
     cl_int ret;
+    cl_kernel mem_mgmt_kernels[2];
     cl_kernel conv_kernels[2];
     load_kernel("pe_ff", &conv_kernels[0]);
-    load_kernel("pe_tile_ff", &conv_kernels[1]);
+    load_kernel("pe_ff_pipe", &conv_kernels[1]);
+    load_kernel("load_mem", &mem_mgmt_kernels[0]);
+    load_kernel("mem_write", &mem_mgmt_kernels[1]);
 
     int ok = 0;
     const int n_stacks=3;
@@ -69,7 +72,7 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
         // First non-residual block
         fm_t* fm_prev = fm;
         activation_t act_type = LEAKYRELU;
-        fm = convolve(resnet->convs[0], fm, 1, conv_kernels); free_fm(fm_prev);
+        fm = convolve(resnet->convs[0], fm, 1, conv_kernels, mem_mgmt_kernels); free_fm(fm_prev);
         fm = normalize(resnet->bns[0], fm);
         fm = activate(fm, act_type);
         fm_t* fm_shortcut = fm;
@@ -83,11 +86,11 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
             for(int bl=0; bl<resnet->nblocks; ++bl){
                 // Main block C->BN->Act->C->BN
                 int strides = (st>0 && bl==0)? 2: 1;
-                fm = convolve(resnet->convs[conv_index], fm, strides, conv_kernels); ++conv_index;
+                fm = convolve(resnet->convs[conv_index], fm, strides, conv_kernels, mem_mgmt_kernels); ++conv_index;
                 fm = normalize(resnet->bns[bn_index], fm); ++bn_index;
                 fm = activate(fm, act_type);
                 fm_prev = fm;
-                fm = convolve(resnet->convs[conv_index], fm, 1, conv_kernels); ++conv_index; free_fm(fm_prev);
+                fm = convolve(resnet->convs[conv_index], fm, 1, conv_kernels, mem_mgmt_kernels); ++conv_index; free_fm(fm_prev);
                 fm = normalize(resnet->bns[bn_index], fm); ++bn_index;
                 
                 // Update indices (not very beautyful but easier than recalculating)
@@ -97,7 +100,7 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
                     // shortcut with dim reduction between stacks
                     fm_prev = fm_shortcut;
                     fm_shortcut = convolve(resnet->convs[short_conv_index], 
-                                            fm_shortcut, 2, conv_kernels);
+                                            fm_shortcut, 2, conv_kernels, mem_mgmt_kernels);
                     free_fm(fm_prev);
                 }
 

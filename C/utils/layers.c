@@ -10,31 +10,36 @@
 
 
 
-fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_kernel* kernels){
+fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_kernel* kernels, cl_kernel* memory_kernels){
     assert(conv->size_in == fm_in->nchannels);
     fm_t* fm_out = alloc_fm(conv->size_out, fm_in->fdim/strides);
 
     // set kernel arguments
-    cl_kernel _kernel = (strides==1 && conv->xsize==3)? kernels[0]: kernels[0];
+    cl_kernel _kernel = (strides==1 && conv->xsize==3)? kernels[1]: kernels[0];
+    int pipe = (strides==1 && conv->xsize==3)? 1: 0;
 
     cl_int ret;
-    ret = clSetKernelArg(_kernel, 0, sizeof(int),    (void *)&(conv->size_in));      checkError(ret, "Failed to set args");       
-    ret = clSetKernelArg(_kernel, 1, sizeof(int),    (void *)&(conv->size_out));     checkError(ret, "Failed to set args");        
-    ret = clSetKernelArg(_kernel, 2, sizeof(int),    (void *)&(conv->xsize));        checkError(ret, "Failed to set args");     
-    ret = clSetKernelArg(_kernel, 3, sizeof(int),    (void *)&(strides));            checkError(ret, "Failed to set args"); 
-    ret = clSetKernelArg(_kernel, 4, sizeof(int),    (void *)&(fm_in->fdim));        checkError(ret, "Failed to set args");     
-    ret = clSetKernelArg(_kernel, 5, sizeof(int),    (void *)&(fm_out->fdim));       checkError(ret, "Failed to set args");      
-    ret = clSetKernelArg(_kernel, 6, sizeof(cl_mem), (void *)&(conv->fpga_kernel));  checkError(ret, "Failed to set args");           
-    ret = clSetKernelArg(_kernel, 7, sizeof(cl_mem), (void *)&(fm_in->fpga_values)); checkError(ret, "Failed to set args");            
-    ret = clSetKernelArg(_kernel, 8, sizeof(cl_mem), (void *)&(fm_out->fpga_values));checkError(ret, "Failed to set args");             
-
+    cl_int args = 0;
+    ret = clSetKernelArg(_kernel, args++, sizeof(int),    (void *)&(conv->size_in));      checkError(ret, "Failed to set args");       
+    ret = clSetKernelArg(_kernel, args++, sizeof(int),    (void *)&(conv->size_out));     checkError(ret, "Failed to set args");        
+    ret = clSetKernelArg(_kernel, args++, sizeof(int),    (void *)&(conv->xsize));        checkError(ret, "Failed to set args");     
+    ret = clSetKernelArg(_kernel, args++, sizeof(int),    (void *)&(strides));            checkError(ret, "Failed to set args"); 
+    ret = clSetKernelArg(_kernel, args++, sizeof(int),    (void *)&(fm_in->fdim));        checkError(ret, "Failed to set args");     
+    ret = clSetKernelArg(_kernel, args++, sizeof(int),    (void *)&(fm_out->fdim));       checkError(ret, "Failed to set args");      
+    if (pipe==0) {
+        ret = clSetKernelArg(_kernel, args++, sizeof(cl_mem), (void *)&(conv->fpga_kernel));  checkError(ret, "Failed to set args");           
+        ret = clSetKernelArg(_kernel, args++, sizeof(cl_mem), (void *)&(fm_in->fpga_values)); checkError(ret, "Failed to set args");            
+        ret = clSetKernelArg(_kernel, args++, sizeof(cl_mem), (void *)&(fm_out->fpga_values));checkError(ret, "Failed to set args");             
+    }
     // Execute the OpenCL kernel
     cl_event event;
     if(_kernel == kernels[1]){
         size_t global_size[2] = {(size_t) fm_in->fdim, (size_t) fm_in->fdim};
         size_t local_size[2] = {(size_t) TILE_SIZE, (size_t) TILE_SIZE};
-        ret = clEnqueueNDRangeKernel(space->queue, _kernel, 2, NULL,
-                global_size, local_size, 0, NULL, &event);
+        enqueue_load_mem(conv, fm_in, fm_out, memory_kernels[0]);
+        ret = clEnqueueTask(space->queue, _kernel, 0, NULL, &event);
+        event = enqueue_mem_write(conv, fm_in, fm_out, memory_kernels[1]);
+    
     }else{
         size_t global_size = (size_t) conv->size_out;
         size_t local_size = (size_t) 8;
@@ -50,6 +55,60 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_kernel* kernels){
 
     return fm_out;
 }
+
+cl_event enqueue_load_mem(conv_t* conv, fm_t* fm_in, fm_t* fm_out, cl_kernel kernel) {
+    cl_int ret;
+    cl_int args=0;
+
+    ret = clSetKernelArg(kernel, args++, sizeof(int), (void*)&(conv->size_in));
+    checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(kernel, args++, sizeof(int), (void*)&(conv->size_out));
+    checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(kernel, args++, sizeof(int), (void*)&(conv->xsize));
+    checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(kernel, args++, sizeof(int), (void*)&(fm_in->fdim));
+    checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(kernel, args++, sizeof(int), (void*)&(fm_out->fdim));
+    checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(kernel, args++, sizeof(cl_mem), (void*)&(conv->fpga_kernel));
+    checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(kernel, args++, sizeof(cl_mem), (void*)&(fm_in->fpga_values));
+    checkError(ret, "Failed to set args");
+
+    cl_event event;
+    size_t global_size = 1;
+    size_t local_size = 1;
+    ret = clEnqueueTask(space->kernel_queues[0], kernel, 0, NULL, &event);
+    checkError(ret, "Failed to enqueue Kernel");
+    
+    return event;
+}
+
+cl_event enqueue_mem_write(conv_t* conv, fm_t* fm_in, fm_t* fm_out, cl_kernel kernel) {
+    cl_int ret;
+    cl_int args=0;
+
+    ret = clSetKernelArg(kernel, args++, sizeof(int), (void*)&(conv->size_in));
+    checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(kernel, args++, sizeof(int), (void*)&(conv->size_out));
+    checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(kernel, args++, sizeof(int), (void*)&(fm_in->fdim));
+    checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(kernel, args++, sizeof(int), (void*)&(fm_out->fdim));
+    checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(kernel, args++, sizeof(cl_mem), (void*)&(fm_out->fpga_values));
+    checkError(ret, "Failed to set args");
+
+    cl_event event;
+    
+    size_t global_size = 1;
+    size_t local_size = 1;
+    ret = clEnqueueTask(space->kernel_queues[1], kernel, 0, NULL, &event);
+    checkError(ret, "Failed to enqueue kernel");
+
+    return event;
+}
+
 fm_t* fully_connect(dense_t* dense, fm_t* fm_in){
     assert(dense->size_in == fm_in->nchannels);
     fm_t* fm_out = alloc_fm(dense->size_out, 1);

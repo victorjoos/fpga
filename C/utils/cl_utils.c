@@ -54,7 +54,10 @@ int init_cl(char* file_name){
 
     // Create a command queue
     space->queue = clCreateCommandQueue(space->context, device_id, 0, &ret);
-    checkError(ret, "Failed create command queue");
+    space->kernel_queues[0] = clCreateCommandQueue(space->context, device_id, 0, &ret);
+    space->kernel_queues[1] = clCreateCommandQueue(space->context, device_id, 0, &ret);
+    
+	checkError(ret, "Failed create command queue");
 
     // Create a program from the kernel source
 	#ifndef FPGA_BUILD 
@@ -94,7 +97,8 @@ int load_kernel(char* kernel_name,
     cl_int ret; 
 
     // create kernel
-    *kernel = clCreateKernel(space->program, kernel_name, &ret);
+    printf("kernel name: %s\n", kernel_name);
+	*kernel = clCreateKernel(space->program, kernel_name, &ret);
     checkError(ret, "Failed creating kernel");
 
     return 1;

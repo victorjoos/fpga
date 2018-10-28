@@ -10,7 +10,9 @@
 // } layer_t;
 
 
-fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_kernel* kernels);
+fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_kernel* kernels, cl_kernel* memory_kernels);
+cl_event enqueue_load_mem(conv_t* conv, fm_t* fm_in, fm_t* fm_out, cl_kernel kernel);
+cl_event enqueue_mem_write(conv_t* conv, fm_t* fm_in, fm_t* fm_out, cl_kernel kernel);
 fm_t* fully_connect(dense_t* dense, fm_t* fm_in);
 fm_t* avg_pool(fm_t* fm_in);
 // are in place!!

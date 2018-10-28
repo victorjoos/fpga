@@ -23,7 +23,7 @@ void print_fm_test(__global const float* fm, int fdim, int fsize){
 #define MASK_WEIGHT 0xffffffff
 #define MASK_ACT 0xffffffff
 
-typedef int8 data_t;
+typedef float data_t;
 
 typedef struct {
     data_t data[KERNEL_SIZE][KERNEL_SIZE];
@@ -46,6 +46,7 @@ typedef struct {
 } lane_t;
 
 channel vec_fmap_t fmap_channel;
+//channel vec_weight_t weight_channel __attribute((depth(0)));
 channel vec_weight_t weight_channel;
 channel data_t conv_channel;
 channel data_t bn_channel;
@@ -55,8 +56,8 @@ channel vec_fmap_t act_channel;
 
 // #define PATCH_SIZE 6
 __kernel void load_mem(const int conv_size_in, const int conv_size_out,
-                        const int fdim_in, const int fdim_out,
                         const int ksize,
+                        const int fdim_in, const int fdim_out,
                         __global const float* restrict conv_kernel,
                         __global const float* restrict fm_in) {
     
@@ -65,7 +66,10 @@ __kernel void load_mem(const int conv_size_in, const int conv_size_out,
     const int xsize = ysize*ksize;         // TODO: avoid multiplication in kernel
     const int offset = ksize/2;
     const int fsize_in = fdim_in * fdim_in;
-    
+    // printf("loading mem ?\n");
+    int number_of_writes=1;
+    printf("hello from load_mem with fdim: %d; number of fmaps: %d\n", fdim_in, conv_size_out);
+
     __local vec_fmap_t fmap_line;
     __local vec_weight_t weights; // turn to vector of NUM_LANES
     for(int outf=0; outf<conv_size_out; ++outf) {/* Loop over all output fmaps */
@@ -76,8 +80,10 @@ __kernel void load_mem(const int conv_size_in, const int conv_size_out,
                     weights.data[k][l] = conv_kernel[k*xsize + l*ysize + inf*conv_size_out + outf];
                 }
             }
+            mem_fence(CLK_CHANNEL_MEM_FENCE);
             write_channel_intel(weight_channel, weights);
-
+            // printf("%d\n", number_of_writes++);
+            // printf("wrote kernel to channel for in:%d, out:%d\n", inf, outf);
             for (int ii=-offset; ii<fdim_in+1;++ii) {
                 for (int jj=-offset; jj<fdim_in+1; jj+=ksize) {
                     for (int kk=0; kk<ksize; ++kk) {
@@ -86,32 +92,43 @@ __kernel void load_mem(const int conv_size_in, const int conv_size_out,
                         else fm_elem = fm_in[inf*fsize_in + ii*fdim_in + (jj+kk)];
                         fmap_line.data[kk] = fm_elem;
                     }
+                    mem_fence(CLK_CHANNEL_MEM_FENCE);
                     write_channel_intel(fmap_channel, fmap_line);
+                    // printf("%d\n", number_of_writes++);
                 }
             }
         }
+        printf("[load_mem] got to outf: %d\n", outf);
     }
+    printf("[load_mem] end of load_mem\n");
 }
 
 __kernel void pe_ff_pipe(const int conv_size_in, const int conv_size_out,
-                        const int fdim_in, const int fdim_out,
-                        const int ksize) {
+                        const int ksize, const int strides,
+                        const int fdim_in, const int fdim_out) {
     
 
     __local vec_weight_t fmap_tile;
     __local vec_weight_t weights;
+    int number_of_writes = 1;
+    printf("hello from pe_ff_pipe with fdim: %d; number of fmaps: %d\n", fdim_in, conv_size_out);
+
     for(int outf=0; outf<conv_size_out; ++outf) {/* Loop over all output fmaps */
         for(int inf=0; inf<conv_size_in; ++inf) {
+            
+            mem_fence(CLK_CHANNEL_MEM_FENCE);
             weights = read_channel_intel(weight_channel);
             for (int ii=0; ii<fdim_in; ++ii) {
                 /* load first elements from channel */
                 for (int kk=1; kk<ksize; ++kk) {
+                    mem_fence(CLK_CHANNEL_MEM_FENCE);
                     vec_fmap_t in_channel = read_channel_intel(fmap_channel);
                     for (int i=0; i<TILE_SIZE+2; ++i) {
                         fmap_tile.data[kk][i] = in_channel.data[i];
                     }
                 }
                 for (int jj=0; jj<fdim_in; ++jj) {
+                    mem_fence(CLK_CHANNEL_MEM_FENCE);
                     vec_fmap_t temp = read_channel_intel(fmap_channel);
                     for (int i=0; i<TILE_SIZE+2; ++i) {
                         fmap_tile.data[0][i] = fmap_tile.data[1][i];
@@ -125,10 +142,13 @@ __kernel void pe_ff_pipe(const int conv_size_in, const int conv_size_out,
                             acc += weights.data[ki][kj] * fmap_tile.data[ki][kj];
                         }
                     }
+                    mem_fence(CLK_CHANNEL_MEM_FENCE);
                     write_channel_intel(conv_channel, acc);
+                    printf("%d\n", number_of_writes++);
                 }
             }
         }
+        printf("[pe_ff] got to fmap_out: %d\n", outf);
     }
 }
 
@@ -138,21 +158,26 @@ __kernel void mem_write(const int conv_size_in, const int conv_size_out,
     const int fsize_out = fdim_out * fdim_out;
     
     __local data_t out[64][64];
+    printf("hello from mem_write with fdim: %d; number of fmaps: %d\n", fdim_in, conv_size_out);
 
     for (int outf=0; outf<conv_size_out; ++outf) {
         for (int inf=0; inf<conv_size_in; ++inf) {
             for (int ii=0; ii<fdim_in; ++ii) {
                 for (int jj=0; jj<fdim_in; ++jj) {
+                    mem_fence(CLK_CHANNEL_MEM_FENCE);
                     if (inf+1 == conv_size_in) {
                         fm_out[outf*fsize_out + ii*fdim_out + jj] = out[ii][jj] + read_channel_intel(conv_channel);
                         out[ii][jj] = 0;
+                        // printf("got one whole fmap ready for out[%d][%d]=%f!\n", ii, jj, fm_out[outf*fsize_out + ii*fdim_out + jj]);
                     } else {
                         out[ii][jj] += read_channel_intel(conv_channel);
                     }
                 }
             }
         }
+        printf("got to fmap_out: %d\n", outf);
     }
+    printf("write ended\n");
 }
 
 __kernel void pe_ff( const int conv_size_in, const int conv_size_out,
