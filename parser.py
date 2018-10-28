@@ -4,6 +4,16 @@ import h5py
 import struct
 import numpy as np
 import re
+
+def ternarize(x):
+    W = x.clip(-1,1)
+    cutoff = 0.7*np.abs(x).mean()
+    ones = np.ones_like(W)
+    zeros = np.zeros_like(W)
+    Wt = np.where(W>cutoff, ones, np.where(W<=-cutoff, -ones, zeros))
+    return Wt
+
+
 class Bn():
     def __init__(self, data):
         self.beta = np.array(data["beta:0"]).astype('float32')
@@ -12,32 +22,32 @@ class Bn():
         self.var = np.array(data["moving_variance:0"]).astype('float32')
         print(self.beta.shape[0])
         self.sizes = np.array([self.beta.shape[0]]).astype(np.int32).tobytes()
-        self.all = [self.beta, self.mean, self.gamma/np.sqrt(self.var + 10**-3)]
-        # self.all = [self.beta, self.gamma, self.mean, self.var]
+        sve = self.gamma/np.sqrt(self.var + 10**-3)
+        self.all = [self.beta - (self.mean*sve), sve]
+        
 class Conv():
-    def __init__(self, data):
+    def __init__(self, data, ternary=True):
         self.kernel = np.array(data["kernel:0"])
-        # self.bias = data["bias:0"]
+        if ternarize:
+            self.kernel = ternarize(self.kernel)
         print(self.kernel.shape)
-        # print(self.kernel[1][2][2][5])
-        # print(self.bias[0])
         self.strides = self.kernel.shape[0]
         self.size_in = self.kernel.shape[2]
         self.size_out = self.kernel.shape[3]
         self.sizes = np.array([self.strides, self.size_in, self.size_out]).astype(np.int32).tobytes()
         self.kernel.resize(self.strides*self.strides*self.size_in*self.size_out)
-        # print(self.kernel[self.strides*self.size_in*self.size_out + 2*self.size_in*self.size_out + 2*self.size_out + 5])
-        self.all = [self.kernel]#, self.bias]
+        self.all = [self.kernel]
 class Dense():
-    def __init__(self, data):
+    def __init__(self, data, ternary=True):
         self.kernel = np.array(data["kernel:0"])
+        if ternarize:
+            self.kernel = ternarize(self.kernel)
         print(self.kernel.shape)
-        # self.bias = data["bias:0"]
         self.size_in = self.kernel.shape[0]
         self.size_out = self.kernel.shape[1]
         self.sizes = np.array([self.size_in, self.size_out]).astype(np.int32).tobytes()
         self.kernel.resize(self.size_in*self.size_out)
-        self.all = [self.kernel]#, self.bias]
+        self.all = [self.kernel]
 
 # Converts a float hdf5_dataset to a bytes array
 def fldata_to_barr(fl):

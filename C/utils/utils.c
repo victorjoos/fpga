@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include <math.h>
 #include "utils.h"
 #include "activations.h"
 #include "cl_utils.h"
@@ -103,11 +104,19 @@ bn_t * read_bn(char* filename){
     bn->size = sizes[0];
     
     // read remaining values
-    float* values = (float*) malloc(sizeof(float) * 3*bn->size);
-    fread(values, sizeof(float), 3*bn->size, fp);
+    float* values = (float*) malloc(sizeof(float) * 2*bn->size);
+    fread(values, sizeof(float), 2*bn->size, fp);
     bn->beta = values;
-    bn->mean = bn->beta + bn->size;
-    bn->gamma = bn->mean + bn->size;
+    for(int i=0; i<bn->size; ++i) values[i] = roundf(values[i]*32.f)/32.f;
+    bn->gamma = bn->beta + bn->size;
+    for(int i=0; i<bn->size; ++i){
+        float x = bn->gamma[i];
+        float sign = roundf(fabs(x)/x);
+        float expo = roundf(log2f(fabs(x)));
+        float nv = (expo<-31.f)? 0.f: powf(2, expo);
+        x = sign*nv;
+        bn->gamma[i]=x;
+    }
     fclose(fp);
     return bn;
 }
@@ -187,6 +196,6 @@ void free_bn(bn_t* bn){
 void free_fm(fm_t* fm){
     // clEnqueueUnmapMemObject (space->queue, fm->fpga_values, fm->values, 0, NULL, NULL);
     // clReleaseMemObject (fm->fpga_values);
-    free(fm);
     space->taken[fm->mem_buff_channel] = 0;
+    free(fm);
 }

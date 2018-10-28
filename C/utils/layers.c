@@ -116,10 +116,9 @@ fm_t* normalize(bn_t* bn, fm_t* fm_in){
     for(int n=0; n<fm_in->nchannels; ++n){
         float beta = bn->beta[n];
         float gamma = bn->gamma[n];
-        float mean = bn->mean[n];
         for(int i=0; i<fm_in->fsize; ++i){
             float x = *values;
-            *values = (x-mean) * gamma + beta;
+            *values = x * gamma + beta;
             ++values;
         }
     }

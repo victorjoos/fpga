@@ -26,8 +26,8 @@ void free_resnet(resnet_t* resnet){
 }
 
 resnet_t* build_resnet(int nblocks, char* dir){
-    const int n_bn = 6*nblocks+1;
-    const int n_conv = n_bn + 2;
+    const int n_bn = 6*nblocks+3;
+    const int n_conv = n_bn;
     const int n_dense = 1;
     resnet_t* resnet = (resnet_t*) malloc(sizeof(resnet_t));
     resnet->bns = (bn_t**) malloc(sizeof(bn_t*)*n_bn + 
@@ -68,11 +68,10 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
         fm_t* fm = img_to_fm(img);
         // First non-residual block
         fm_t* fm_prev = fm;
-        activation_t act_type = BINARY;
+        activation_t act_type = TERNARY;
         fm = convolve(resnet->convs[0], fm, 1, conv_kernels); free_fm(fm_prev);
         fm = normalize(resnet->bns[0], fm);
         fm = activate(fm, act_type);
-
         fm_t* fm_shortcut = fm;
 
         int conv_index = 1;
@@ -82,7 +81,7 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
         for(int st=0; st<n_stacks; ++st){
             // Loop over the blocks
             for(int bl=0; bl<resnet->nblocks; ++bl){
-                // Main block C->BN->Act->C->BN
+                // Main block C->BN->Act->C->BN->Act
                 int strides = (st>0 && bl==0)? 2: 1;
                 fm = convolve(resnet->convs[conv_index], fm, strides, conv_kernels); ++conv_index;
                 fm = normalize(resnet->bns[bn_index], fm); ++bn_index;
@@ -90,7 +89,8 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
                 fm_prev = fm;
                 fm = convolve(resnet->convs[conv_index], fm, 1, conv_kernels); ++conv_index; free_fm(fm_prev);
                 fm = normalize(resnet->bns[bn_index], fm); ++bn_index;
-                
+                fm = activate(fm, act_type);
+
                 // Update indices (not very beautyful but easier than recalculating)
                 if (st>0 && bl==0) {
                     short_conv_index = conv_index;
@@ -100,6 +100,8 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
                     fm_shortcut = convolve(resnet->convs[short_conv_index], 
                                             fm_shortcut, 2, conv_kernels);
                     free_fm(fm_prev);
+                    fm_shortcut = normalize(resnet->bns[bn_index], fm_shortcut); ++bn_index;
+                    fm_shortcut = activate(fm_shortcut, act_type);
                 }
 
                 // Addition with shortcut

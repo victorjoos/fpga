@@ -11,4 +11,4 @@ typedef struct opencl_space{
     cl_mem fm_fpga_buffers[NMB_FM];
 }cl_space_t;
 
-#define MAX_FM_SIZE (32*32*16)
+#define MAX_FM_SIZE (32*32*32*16)

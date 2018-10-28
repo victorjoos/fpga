@@ -18,3 +18,11 @@ float bin_htanh(float x){
     float plop = 2.f*round(clipped) - 1.f;
     return plop;
 }
+
+float ter_htanh(float x){
+    float ret;
+    if (fabs(x)<0.5) ret =  0.f;
+    else if (x<0)    ret = -1.f;
+    else             ret =  1.f;
+    return ret;
+}

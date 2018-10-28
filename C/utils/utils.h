@@ -30,7 +30,6 @@ typedef struct dense {
 
 typedef struct bn {
     float * beta;
-    float * mean;
     float * gamma;
     int size;
 } bn_t;
