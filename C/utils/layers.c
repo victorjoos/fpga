@@ -105,7 +105,6 @@ cl_event enqueue_mem_write(conv_t* conv, fm_t* fm_in, fm_t* fm_out, cl_kernel ke
     size_t local_size = 1;
     ret = clEnqueueTask(space->kernel_queues[1], kernel, 0, NULL, &event);
     checkError(ret, "Failed to enqueue kernel");
-
     return event;
 }
 
