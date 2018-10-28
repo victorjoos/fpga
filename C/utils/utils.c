@@ -68,7 +68,6 @@ conv_t * read_conv(char* filename){
     conv->fpga_kernel = alloc_shared_buffer(kernel_size, &values);
 
     fread(values, sizeof(float), kernel_size, fp);
-    for(int i=0; i<kernel_size; ++i) values[i] = bin_htanh(values[i]);    
     conv->kernel = values;
     fclose(fp);
     return conv;
@@ -89,7 +88,6 @@ dense_t * read_dense(char* filename){
     dense->fpga_kernel = alloc_shared_buffer(kernel_size, &values);
 
     fread(values, sizeof(float), kernel_size, fp);
-    for(int i=0; i<kernel_size; ++i) values[i] = bin_htanh(values[i]);        
     dense->kernel = values;
     fclose(fp);
     return dense;
@@ -107,16 +105,16 @@ bn_t * read_bn(char* filename){
     float* values = (float*) malloc(sizeof(float) * 2*bn->size);
     fread(values, sizeof(float), 2*bn->size, fp);
     bn->beta = values;
-    for(int i=0; i<bn->size; ++i) values[i] = roundf(values[i]*32.f)/32.f;
+    // for(int i=0; i<bn->size; ++i) values[i] = roundf(values[i]*32.f)/32.f;
     bn->gamma = bn->beta + bn->size;
-    for(int i=0; i<bn->size; ++i){
-        float x = bn->gamma[i];
-        float sign = roundf(fabs(x)/x);
-        float expo = roundf(log2f(fabs(x)));
-        float nv = (expo<-31.f)? 0.f: powf(2, expo);
-        x = sign*nv;
-        bn->gamma[i]=x;
-    }
+    // for(int i=0; i<bn->size; ++i){
+    //     float x = bn->gamma[i];
+    //     float sign = roundf(fabs(x)/x);
+    //     float expo = roundf(log2f(fabs(x)));
+    //     float nv = (expo<-31.f)? 0.f: powf(2, expo);
+    //     x = sign*nv;
+    //     bn->gamma[i]=x;
+    // }
     fclose(fp);
     return bn;
 }

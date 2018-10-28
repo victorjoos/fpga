@@ -5,12 +5,16 @@ import struct
 import numpy as np
 import re
 
-def ternarize(x):
+def ternarize(x, plop=[]):
     W = x.clip(-1,1)
     cutoff = 0.7*np.abs(x).mean()
-    ones = np.ones_like(W)
-    zeros = np.zeros_like(W)
+    print(cutoff)
+    ones = np.ones_like(W).astype('float32')
+    zeros = np.zeros_like(W).astype('float32')
     Wt = np.where(W>cutoff, ones, np.where(W<=-cutoff, -ones, zeros))
+    if len(plop)==0:
+        plop.append(5)
+        print(Wt)
     return Wt
 
 
@@ -22,13 +26,13 @@ class Bn():
         self.var = np.array(data["moving_variance:0"]).astype('float32')
         print(self.beta.shape[0])
         self.sizes = np.array([self.beta.shape[0]]).astype(np.int32).tobytes()
-        sve = self.gamma/np.sqrt(self.var + 10**-3)
+        sve = self.gamma/np.sqrt(self.var + 1e-3)
         self.all = [self.beta - (self.mean*sve), sve]
         
 class Conv():
     def __init__(self, data, ternary=True):
         self.kernel = np.array(data["kernel:0"])
-        if ternarize:
+        if ternary:
             self.kernel = ternarize(self.kernel)
         print(self.kernel.shape)
         self.strides = self.kernel.shape[0]
@@ -40,9 +44,10 @@ class Conv():
 class Dense():
     def __init__(self, data, ternary=True):
         self.kernel = np.array(data["kernel:0"])
-        if ternarize:
+        if ternary:
             self.kernel = ternarize(self.kernel)
-        print(self.kernel.shape)
+        np.set_printoptions(threshold=np.inf)
+        print(self.kernel)
         self.size_in = self.kernel.shape[0]
         self.size_out = self.kernel.shape[1]
         self.sizes = np.array([self.size_in, self.size_out]).astype(np.int32).tobytes()

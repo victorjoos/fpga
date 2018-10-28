@@ -72,6 +72,7 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
         fm = convolve(resnet->convs[0], fm, 1, conv_kernels); free_fm(fm_prev);
         fm = normalize(resnet->bns[0], fm);
         fm = activate(fm, act_type);
+        
         fm_t* fm_shortcut = fm;
 
         int conv_index = 1;
@@ -90,7 +91,7 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
                 fm = convolve(resnet->convs[conv_index], fm, 1, conv_kernels); ++conv_index; free_fm(fm_prev);
                 fm = normalize(resnet->bns[bn_index], fm); ++bn_index;
                 fm = activate(fm, act_type);
-
+                
                 // Update indices (not very beautyful but easier than recalculating)
                 if (st>0 && bl==0) {
                     short_conv_index = conv_index;
@@ -108,7 +109,8 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
                 fm = add(fm, fm_shortcut); free_fm(fm_shortcut);
                 fm = divide(fm);
                 fm = activate(fm, act_type);
-
+                    // print_fm(fm_shortcut, 0);
+                    // return 0.;
                 // Update shortcut value
                 fm_shortcut = fm;
                              

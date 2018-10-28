@@ -94,6 +94,7 @@ fm_t* activate(fm_t* fm_in, activation_t activ){
         case LEAKYRELU: f = leaky_relu; break;
         case TANH: f = act_tanh; break;
         case BINARY: f = bin_htanh; break;
+        case TERNARY: f = ter_htanh; break;
         default:  f = act_relu;
     }
     return apply_f(fm_in, f);
