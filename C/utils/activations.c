@@ -21,8 +21,15 @@ float bin_htanh(float x){
 
 float ter_htanh(float x){
     float ret;
-    if (fabs(x)<0.5) ret =  0.f;
-    else if (x<0)    ret = -1.f;
-    else             ret =  1.f;
+    // if (fabsf(x)<0.5f) ret =  0.f;
+    // else if (x<0)    ret = -1.f;
+    // else             ret =  1.f;
+    if(x<0.f){
+        if(x>-0.5f) ret =  0.f;
+        else        ret = -1.f;
+    } else {
+        if(x<=0.5f) ret =  0.f;
+        else        ret =  1.f;
+    }
     return ret;
 }

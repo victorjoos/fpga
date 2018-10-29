@@ -95,7 +95,7 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
                 // Update indices (not very beautyful but easier than recalculating)
                 if (st>0 && bl==0) {
                     short_conv_index = conv_index;
-                    ++conv_index;                    
+                    ++conv_index;
                     // shortcut with dim reduction between stacks
                     fm_prev = fm_shortcut;
                     fm_shortcut = convolve(resnet->convs[short_conv_index], 
@@ -109,8 +109,6 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
                 fm = add(fm, fm_shortcut); free_fm(fm_shortcut);
                 fm = divide(fm);
                 fm = activate(fm, act_type);
-                    // print_fm(fm_shortcut, 0);
-                    // return 0.;
                 // Update shortcut value
                 fm_shortcut = fm;
                              
