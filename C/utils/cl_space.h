@@ -7,9 +7,10 @@ typedef struct opencl_space{
     float * fm_buffers[NMB_FM];
     cl_context context; 
     cl_command_queue queue;
-    cl_command_queue kernel_queues[2];
+    cl_command_queue mem_load_queue;
     cl_program program;
     cl_mem fm_fpga_buffers[NMB_FM];
+    cl_command_queue mem_write_queue;
 }cl_space_t;
 
 #define MAX_FM_SIZE (32*32*16)

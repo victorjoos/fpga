@@ -53,9 +53,9 @@ int init_cl(char* file_name){
     checkError(ret, "Failed create context");
 
     // Create a command queue
-    space->queue = clCreateCommandQueue(space->context, device_id, 0, &ret);
-    space->kernel_queues[0] = clCreateCommandQueue(space->context, device_id, 0, &ret);
-    space->kernel_queues[1] = clCreateCommandQueue(space->context, device_id, 0, &ret);
+    space->queue = clCreateCommandQueue(space->context, device_id, CL_QUEUE_PROFILING_ENABLE, &ret);
+    space->mem_load_queue = clCreateCommandQueue(space->context, device_id, CL_QUEUE_PROFILING_ENABLE, &ret);
+    space->mem_write_queue = clCreateCommandQueue(space->context, device_id, CL_QUEUE_PROFILING_ENABLE, &ret);
     
 	checkError(ret, "Failed create command queue");
 
@@ -82,9 +82,11 @@ int init_cl(char* file_name){
 					sizeof(float) * MAX_FM_SIZE, NULL, &ret);
 		checkError(ret, "Failed to create buffer");
 		assert (space->fm_fpga_buffers[i] != NULL);
+		cl_event event;
 		space->fm_buffers[i] = (float*) clEnqueueMapBuffer(space->queue, space->fm_fpga_buffers[i], 
-					CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(float) * MAX_FM_SIZE, 0, NULL, NULL, &ret);
+					CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(float) * MAX_FM_SIZE, 0, NULL, &event, &ret);
 		checkError(ret, "Failed to map shared memory");
+		clWaitForEvents(1, &event);
 		assert (space->fm_buffers[i] != NULL);
 		space->taken[i] = 0;
 	}

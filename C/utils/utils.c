@@ -20,8 +20,10 @@ cl_mem alloc_shared_buffer (size_t size, float **host_ptr) {
   cl_mem device_ptr = clCreateBuffer(space->context, CL_MEM_ALLOC_HOST_PTR, sizeof(float) * size, NULL, &status);
   checkError(status, "Failed to create buffer");
   assert (host_ptr != NULL);
-  *host_ptr = (float*) clEnqueueMapBuffer(space->queue, device_ptr, CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(float) * size, 0, NULL, NULL, &status);
+  cl_event event;
+  *host_ptr = (float*) clEnqueueMapBuffer(space->queue, device_ptr, CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(float) * size, 0, NULL, &event, &status);
   checkError(status, "Failed to create shared pointer");
+  clWaitForEvents(1, &event);
   assert (*host_ptr != NULL);
   return device_ptr;
 }

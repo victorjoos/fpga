@@ -45,18 +45,29 @@ typedef struct {
     data_t lane[NUM_LANES];
 } lane_t;
 
-channel vec_fmap_t fmap_channel;
-channel vec_weight_t weight_channel __attribute((depth(0)));
-channel vec_weight_t weight_channel;
-channel data_t conv_channel;
+#ifdef FPGA_EMU
+channel vec_fmap_t fmap_channel __attribute((depth(999999999)));
+channel vec_weight_t weight_channel __attribute((depth(999999999)));
+// channel vec_weight_t weight_channel;
+channel data_t conv_channel __attribute((depth(999999999)));
 channel data_t bn_channel;
 channel vec_fmap_t act_channel;
+#else
+channel vec_fmap_t fmap_channel __attribute((depth(3)));
+channel vec_weight_t weight_channel __attribute((depth(0)));
+// channel vec_weight_t weight_channel;
+channel data_t conv_channel __attribute((depth(16)));
+channel data_t bn_channel;
+channel vec_fmap_t act_channel;
+#endif
 
 
 
+
+ #define ksize 3
 // #define PATCH_SIZE 6
 __kernel void load_mem(const int conv_size_in, const int conv_size_out,
-                        const int ksize,
+                        const int _ksize,
                         const int fdim_in, const int fdim_out,
                         __global const float* restrict conv_kernel,
                         __global const float* restrict fm_in) {
@@ -67,49 +78,51 @@ __kernel void load_mem(const int conv_size_in, const int conv_size_out,
     const int offset = ksize/2;
     const int fsize_in = fdim_in * fdim_in;
     // printf("loading mem ?\n");
-    int number_of_writes=1;
-    printf("hello from load_mem with fdim: %d; number of fmaps: %d\n", fdim_in, conv_size_out);
+    int number_of_writes=0;
+    // printf("hello from load_mem with fdim: %d; number of fmaps: %d\n", fdim_in, conv_size_out);
 
     __local vec_fmap_t fmap_line;
-    __local vec_weight_t weights; // turn to vector of NUM_LANES
+    __local volatile vec_weight_t weights; // turn to vector of NUM_LANES
     for(int outf=0; outf<conv_size_out; ++outf) {/* Loop over all output fmaps */
         for(int inf=0; inf<conv_size_in; ++inf) {
             /* Send one kernel */
             for (int k=0; k<ksize; ++k) {
                 for (int l=0; l<ksize; ++l) {
-                    weights.data[k][l] = conv_kernel[k*xsize + l*ysize + inf*conv_size_out + outf];
+                    int place = k*xsize + l*ysize + inf*conv_size_out + outf;
+                    weights.data[k][l] = conv_kernel[place];
                 }
             }
             write_channel_intel(weight_channel, weights);
             // printf("%d\n", number_of_writes++);
             // printf("wrote kernel to channel for in:%d, out:%d\n", inf, outf);
-            for (int ii=0; ii<fdim_in;++ii) {
-                for (int jj=-offset; jj<fdim_in+1; jj+=1/*ksize*/) {
-                    for (int kk=0; kk<ksize; ++kk) {
+            for (int ii=-offset; ii<fdim_in-offset;++ii) {
+                for (int jj=-offset; jj<fdim_in+offset; jj+=1/*ksize*/) {
+                    for (int kk=0; kk<TILE_SIZE+2; ++kk) {
                         data_t fm_elem;
-                        if ((ii<0) || (jj+kk<0) || (ii>=fdim_in) || (jj+kk>=fdim_in)) fm_elem = 0;
-                        else fm_elem = fm_in[inf*fsize_in + ii*fdim_in + (jj+kk)];
+                        if ((ii+kk<0) || (jj<0) || (ii+kk>=fdim_in) || (jj>=fdim_in)) fm_elem = 0;
+                        else fm_elem = fm_in[inf*fsize_in + (ii+kk)*fdim_in + (jj)];
                         fmap_line.data[kk] = fm_elem;
                     }
                     write_channel_intel(fmap_channel, fmap_line);
+                    number_of_writes++;
                     // printf("%d\n", number_of_writes++);
                 }
             }
         }
-        printf("[load_mem] got to outf: %d\n", outf);
+        // printf("[load_mem] got to outf: %d\n", outf);
     }
-    printf("[load_mem] end of load_mem\n");
+    // printf("[load_mem] end of load_mem %d\n", number_of_writes);
 }
-
 __kernel void pe_ff_pipe(const int conv_size_in, const int conv_size_out,
-                        const int ksize, const int strides,
+                        const int _ksize, const int strides,
                         const int fdim_in, const int fdim_out) {
     
 
     __local vec_weight_t fmap_tile;
     __local vec_weight_t weights;
-    int number_of_writes = 1;
-    printf("hello from pe_ff_pipe with fdim: %d; number of fmaps: %d\n", fdim_in, conv_size_out);
+    int number_of_reads = 0;
+    int number_of_writes = 0;
+    // printf("hello from pe_ff_pipe with fdim: %d; number of fmaps: %d\n", fdim_in, conv_size_out);
 
     for(int outf=0; outf<conv_size_out; ++outf) {/* Loop over all output fmaps */
         for(int inf=0; inf<conv_size_in; ++inf) {
@@ -117,20 +130,22 @@ __kernel void pe_ff_pipe(const int conv_size_in, const int conv_size_out,
             weights = read_channel_intel(weight_channel);
             for (int ii=0; ii<fdim_in; ++ii) {
                 /* load first elements from channel */
-                for (int kk=1; kk<ksize; ++kk) {
+                /*for (int kk=1; kk<ksize; ++kk) {
                     vec_fmap_t in_channel = read_channel_intel(fmap_channel);
+                    number_of_reads++;
                     for (int i=0; i<TILE_SIZE+2; ++i) {
-                        fmap_tile.data[kk][i] = in_channel.data[i];
+                        fmap_tile.data[i][kk] = in_channel.data[i];
                     }
-                }
-                for (int jj=0; jj<fdim_in; ++jj) {
+                }*/
+                for (int jj=-ksize+1; jj<fdim_in; ++jj) {
                     vec_fmap_t temp = read_channel_intel(fmap_channel);
+                    number_of_reads++;
                     for (int i=0; i<TILE_SIZE+2; ++i) {
-                        fmap_tile.data[0][i] = fmap_tile.data[1][i];
-                        fmap_tile.data[1][i] = fmap_tile.data[2][i];
-                        fmap_tile.data[2][i] = temp.data[i];
+                        fmap_tile.data[i][0] = fmap_tile.data[i][1];
+                        fmap_tile.data[i][1] = fmap_tile.data[i][2];
+                        fmap_tile.data[i][2] = temp.data[i];
                     }
-                    
+                    if (jj<0) continue;
                     data_t acc = 0;
                     for (int ki=0; ki<ksize; ki++) {
                         for (int kj=0; kj<ksize; kj++) {
@@ -138,12 +153,14 @@ __kernel void pe_ff_pipe(const int conv_size_in, const int conv_size_out,
                         }
                     }
                     write_channel_intel(conv_channel, acc);
+                    number_of_writes++;
                     // printf("%d\n", number_of_writes++);
                 }
             }
         }
-        printf("[pe_ff] got to fmap_out: %d\n", outf);
+        // printf("[pe_ff] got to fmap_out: %d\n", outf);
     }
+    // printf("[pe_ff] end of pe ff %d, %d\n", number_of_reads, number_of_writes);
 }
 
 __kernel void mem_write(const int conv_size_in, const int conv_size_out,
@@ -151,30 +168,26 @@ __kernel void mem_write(const int conv_size_in, const int conv_size_out,
                         __global data_t* restrict fm_out) {
     const int fsize_out = fdim_out * fdim_out;
     
-    __local data_t out[64][64];
-    printf("hello from mem_write with fdim: %d; number of fmaps: %d\n", fdim_in, conv_size_out);
+    int number_of_reads = 0;
+    // printf("hello from mem_write with fdim: %d; number of fmaps: %d\n", fdim_in, conv_size_out);
 
     for (int outf=0; outf<conv_size_out; ++outf) {
         for (int inf=0; inf<conv_size_in; ++inf) {
             for (int ii=0; ii<fdim_in; ++ii) {
                 for (int jj=0; jj<fdim_in; ++jj) {
-                    if (inf+1 == conv_size_in) {
-                        fm_out[outf*fsize_out + ii*fdim_out + jj] = out[ii][jj] + read_channel_intel(conv_channel);
-                        out[ii][jj] = 0;
-                        printf("got one whole fmap ready for out[%d][%d]=%f!\n", ii, jj, fm_out[outf*fsize_out + ii*fdim_out + jj]);
-                    } else {
-                        out[ii][jj] += read_channel_intel(conv_channel);
-                    }
+                    fm_out[outf*fsize_out + ii*fdim_out + jj] += read_channel_intel(conv_channel);
+                    number_of_reads++;
+                    // printf("got one whole fmap ready for out[%d][%d]=%f!\n", ii, jj, fm_out[outf*fsize_out + ii*fdim_out + jj]);
                 }
             }
         }
-        printf("[mem_write] got to fmap_out: %d\n", outf);
+        // printf("[mem_write] got to fmap_out: %d\n", outf);
     }
-    printf("write ended\n");
+    // printf("write ended %d\n", number_of_reads);
 }
 
 __kernel void pe_ff( const int conv_size_in, const int conv_size_out,
-                const int ksize, const int strides, 
+                const int _ksize, const int strides, 
                 const int fdim_in, const int fdim_out,
                 __global const float* conv_kernel,
                 __global const float* fm_in, __global float* fm_out){
@@ -183,8 +196,8 @@ __kernel void pe_ff( const int conv_size_in, const int conv_size_out,
     // conv consts
     const int zsize = conv_size_out;
     const int ysize = zsize*conv_size_in;
-    const int xsize = ysize*ksize;         // TODO: avoid multiplication in kernel
-    const int offset = ksize/2;
+    const int xsize = ysize*_ksize;         // TODO: avoid multiplication in kernel
+    const int offset = _ksize/2;
     
     // fm consts
     const int fsize_in = fdim_in*fdim_in; // TODO: avoid multiplication in kernel
@@ -196,8 +209,8 @@ __kernel void pe_ff( const int conv_size_in, const int conv_size_out,
             int j = _j-offset;
             float acc = 0.0f;
             for(int inf=0; inf<conv_size_in; ++inf){
-                for(int k=0; k<ksize; ++k){
-                    for(int l=0; l<ksize; ++l){
+                for(int k=0; k<_ksize; ++k){
+                    for(int l=0; l<_ksize; ++l){
                         float fm_elem;
                         if((i+k<0)||(j+l<0)||(i+k>=fdim_in)||(j+l>=fdim_in)) fm_elem = 0.0f;
                         else fm_elem = fm_in[inf*fsize_in + (i+k)*fdim_in + (j+l)];                                                

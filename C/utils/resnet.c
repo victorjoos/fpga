@@ -73,6 +73,7 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
         fm_t* fm_prev = fm;
         activation_t act_type = LEAKYRELU;
         fm = convolve(resnet->convs[0], fm, 1, conv_kernels, mem_mgmt_kernels); free_fm(fm_prev);
+        print_fm(fm, 0);
         fm = normalize(resnet->bns[0], fm);
         fm = activate(fm, act_type);
         fm_t* fm_shortcut = fm;

@@ -34,8 +34,8 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_kernel* kernels, cl_ke
     // Execute the OpenCL kernel
     cl_event event;
     if(_kernel == kernels[1]){
-        size_t global_size[2] = {(size_t) fm_in->fdim, (size_t) fm_in->fdim};
-        size_t local_size[2] = {(size_t) TILE_SIZE, (size_t) TILE_SIZE};
+        //size_t global_size[2] = {(size_t) fm_in->fdim, (size_t) fm_in->fdim};
+        //size_t local_size[2] = {(size_t) TILE_SIZE, (size_t) TILE_SIZE};
         enqueue_load_mem(conv, fm_in, fm_out, memory_kernels[0]);
         ret = clEnqueueTask(space->queue, _kernel, 0, NULL, &event);
         event = enqueue_mem_write(conv, fm_in, fm_out, memory_kernels[1]);
@@ -78,7 +78,7 @@ cl_event enqueue_load_mem(conv_t* conv, fm_t* fm_in, fm_t* fm_out, cl_kernel ker
     cl_event event;
     size_t global_size = 1;
     size_t local_size = 1;
-    ret = clEnqueueTask(space->kernel_queues[0], kernel, 0, NULL, &event);
+    ret = clEnqueueTask(space->mem_load_queue, kernel, 0, NULL, &event);
     checkError(ret, "Failed to enqueue Kernel");
     
     return event;
@@ -103,7 +103,7 @@ cl_event enqueue_mem_write(conv_t* conv, fm_t* fm_in, fm_t* fm_out, cl_kernel ke
     
     size_t global_size = 1;
     size_t local_size = 1;
-    ret = clEnqueueTask(space->kernel_queues[1], kernel, 0, NULL, &event);
+    ret = clEnqueueTask(space->mem_write_queue, kernel, 0, NULL, &event);
     checkError(ret, "Failed to enqueue kernel");
     return event;
 }
