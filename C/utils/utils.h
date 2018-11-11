@@ -14,7 +14,7 @@ extern cl_space_t *space;
 // For the layer's weights
 typedef enum layer {CONV, BN, DENSE} layer_t;
 typedef struct conv {
-    float * kernel;
+    cl_uchar * kernel;
     cl_mem fpga_kernel;
     int xsize;
     int size_in;
@@ -22,19 +22,20 @@ typedef struct conv {
 } conv_t;
 
 typedef struct dense {
-    float * kernel;
+    cl_uchar * kernel;
     cl_mem fpga_kernel;
     int size_in;
     int size_out;
 } dense_t;
 
 typedef struct bn {
-    float * beta;
-    float * gamma;
+    cl_ushort * beta;
+    cl_char * gamma;
+    cl_char * gamma_sign;
     int size;
 } bn_t;
 typedef struct feature_map{
-    float * values;
+    cl_short * values;
     cl_mem fpga_values;
     int nchannels;
     int fdim;
@@ -58,9 +59,9 @@ void free_dense(dense_t* dense);
 void free_bn(bn_t* bn);
 void free_fm(fm_t* fm);
 
-float get_conv_elem(conv_t* conv, int k, int l, int inf, int outf);
-void set_conv_elem(conv_t* conv, float value, int k, int l, int inf, int outf);
-float get_dense_elem(dense_t* dense, int i, int j);
-float get_fm_elem(fm_t* fm, int channel, int i, int j);
-void set_fm_elem(fm_t* fm, float value, int channel, int i, int j);
+cl_uchar get_conv_elem(conv_t* conv, int k, int l, int inf, int outf);
+void set_conv_elem(conv_t* conv, cl_uchar value, int k, int l, int inf, int outf);
+cl_uchar get_dense_elem(dense_t* dense, int i, int j);
+cl_short get_fm_elem(fm_t* fm, int channel, int i, int j);
+void set_fm_elem(fm_t* fm, cl_short value, int channel, int i, int j);
 #endif

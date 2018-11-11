@@ -17,16 +17,27 @@ unsigned char* read_images(char* filename) {
     return buffer;
 }
 
-cl_mem alloc_shared_buffer (size_t size, float **host_ptr) {
+cl_mem alloc_shared_buffer_uchar (size_t size, cl_uchar **host_ptr) {
   cl_int status;
-  cl_mem device_ptr = clCreateBuffer(space->context, CL_MEM_ALLOC_HOST_PTR, sizeof(float) * size, NULL, &status);
+  cl_mem device_ptr = clCreateBuffer(space->context, CL_MEM_ALLOC_HOST_PTR, sizeof(cl_uchar) * size, NULL, &status);
   checkError(status, "Failed to create buffer");
   assert (host_ptr != NULL);
-  *host_ptr = (float*) clEnqueueMapBuffer(space->queue, device_ptr, CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(float) * size, 0, NULL, NULL, &status);
+  *host_ptr = (cl_uchar*) clEnqueueMapBuffer(space->queue, device_ptr, CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(cl_uchar) * size, 0, NULL, NULL, &status);
   checkError(status, "Failed to create shared pointer");
   assert (*host_ptr != NULL);
   return device_ptr;
 }
+cl_mem alloc_shared_buffer_short (size_t size, cl_short **host_ptr) {
+  cl_int status;
+  cl_mem device_ptr = clCreateBuffer(space->context, CL_MEM_ALLOC_HOST_PTR, sizeof(cl_short) * size, NULL, &status);
+  checkError(status, "Failed to create buffer");
+  assert (host_ptr != NULL);
+  *host_ptr = (cl_short*) clEnqueueMapBuffer(space->queue, device_ptr, CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(cl_short) * size, 0, NULL, NULL, &status);
+  checkError(status, "Failed to create shared pointer");
+  assert (*host_ptr != NULL);
+  return device_ptr;
+}
+
 
 /**
 * - number: an image between 0 and 999
@@ -41,7 +52,7 @@ fm_t* img_to_fm(unsigned char* img){
     for(int n=0; n<3; ++n){
         for(int i=0; i<fm->fdim; ++i){
             for(int j=0; j<fm->fdim; ++j){
-                fm->values[n*32*32+i*32+j] = ((float)img[n*32*32+i*32+j])/255.0f;
+                fm->values[n*32*32+i*32+j] = (cl_short)img[n*32*32+i*32+j];
             }
         }
     }
@@ -64,12 +75,20 @@ conv_t * read_conv(char* filename){
     // read remaining values
     int kernel_size = conv->xsize*conv->xsize*conv->size_in*conv->size_out;
 
-    float* values;
-    conv->fpga_kernel = alloc_shared_buffer(kernel_size, &values);
+    cl_uchar* values;
+    conv->fpga_kernel = alloc_shared_buffer_uchar(kernel_size, &values);
 
-    fread(values, sizeof(float), kernel_size, fp);
+    float * _values = (float*)malloc(sizeof(float)*kernel_size);
+    fread(_values, sizeof(float), kernel_size, fp);
+    for(int i=0; i<kernel_size; ++i){
+        cl_uchar nv = 0b00;
+        if(_values[i]==0.f) nv = 0b10;
+        else if(_values[i]>0.f) nv = 0b01;
+        values[i] = nv;
+    }
     conv->kernel = values;
     fclose(fp);
+    free(_values);
     return conv;
 }
 dense_t * read_dense(char* filename){
@@ -85,10 +104,17 @@ dense_t * read_dense(char* filename){
     // read remaining values
     int kernel_size = dense->size_in*dense->size_out;
     float* values;
-    dense->fpga_kernel = alloc_shared_buffer(kernel_size, &values);
-
-    fread(values, sizeof(float), kernel_size, fp);
+    dense->fpga_kernel = alloc_shared_buffer_uchar(kernel_size, &values);
+    float * _values = (float*)malloc(sizeof(float)*kernel_size);
+    fread(_values, sizeof(float), kernel_size, fp);
+    for(int i=0; i<kernel_size; ++i){
+        cl_uchar nv = 0b00;
+        if(_values[i]==0.f) nv = 0b10;
+        else if(_values[i]>0.f) nv = 0b01;
+        values[i] = nv;
+    }
     dense->kernel = values;
+    free(_values);
     fclose(fp);
     return dense;
 }
@@ -102,20 +128,29 @@ bn_t * read_bn(char* filename){
     bn->size = sizes[0];
     
     // read remaining values
-    float* values = (float*) malloc(sizeof(float) * 2*bn->size);
-    fread(values, sizeof(float), 2*bn->size, fp);
+    float* _values = (float*) malloc(sizeof(float) * 2*bn->size);
+    fread(_values, sizeof(float), 2*bn->size, fp);
+    cl_ushort* values = (cl_ushort*) malloc((sizeof(cl_ushort) + sizeof(cl_char)*2)*bn->size);
     bn->beta = values;
-    // for(int i=0; i<bn->size; ++i) values[i] = roundf(values[i]*32.f)/32.f;
-    bn->gamma = bn->beta + bn->size;
-    // for(int i=0; i<bn->size; ++i){
-    //     float x = bn->gamma[i];
-    //     float sign = roundf(fabs(x)/x);
-    //     float expo = roundf(log2f(fabs(x)));
-    //     float nv = (expo<-31.f)? 0.f: powf(2, expo);
-    //     x = sign*nv;
-    //     bn->gamma[i]=x;
-    // }
+    for(int i=0; i<bn->size; ++i) {
+        // TODO: add alert in case beta is too big
+        values[i] = (cl_ushort) fabsf(roundf(_values[i]*256.f));
+        // MSB is sign bit
+        if (_values[i]<0.f) values[i] |= 0x8000;
+    }
+    bn->gamma = (cl_uchar*) (bn->beta + bn->size);
+    bn->gamma_sign = bn->gamma + bn->size;
+    for(int i=bn->size; i<2*bn->size; ++i) {
+        // TODO: add alert in case gamma exponent is too big
+        float l2 = roundf(log2f(fabsf(_values[i])));
+        l2 = fminf(fmaxf(l2, -128.f), +127.f);
+        // 8bits for exponent
+        values[i] = (cl_char) l2;
+        // 8bits for sign (TODO: optimise??)
+        bn->gamma[i] = (_values[i]<0.f)? 0: 1;
+    }
     fclose(fp);
+    free(_values);
     return bn;
 }
 fm_t* alloc_fm(int nchannels, int fdim){
@@ -141,27 +176,27 @@ fm_t* alloc_fm(int nchannels, int fdim){
 
 
 // wrappers for matrices
-float get_conv_elem(conv_t* conv, int k, int l, int inf, int outf){
+cl_uchar get_conv_elem(conv_t* conv, int k, int l, int inf, int outf){
     int zsize = conv->size_out;
     int ysize = zsize*conv->size_in;
     int xsize = ysize*conv->xsize;
     return conv->kernel[k*xsize + l*ysize + inf*zsize + outf];
 }
-void set_conv_elem(conv_t* conv, float value, int k, int l, int inf, int outf){
+void set_conv_elem(conv_t* conv, cl_uchar value, int k, int l, int inf, int outf){
     int zsize = conv->size_out;
     int ysize = zsize*conv->size_in;
     int xsize = ysize*conv->xsize;
     conv->kernel[k*xsize + l*ysize + inf*zsize + outf] = value;
 }
 
-float get_dense_elem(dense_t * dense, int i, int j){
+cl_uchar get_dense_elem(dense_t * dense, int i, int j){
     return dense->kernel[i*dense->size_out + j];
 }
-float get_fm_elem(fm_t* fm, int channel, int i, int j){
-    if((i<0)||(j<0)||(i>=fm->fdim)||(j>=fm->fdim)) return 0.0f;
+cl_short get_fm_elem(fm_t* fm, int channel, int i, int j){
+    if((i<0)||(j<0)||(i>=fm->fdim)||(j>=fm->fdim)) return 0;
     return fm->values[channel*fm->fsize + i*fm->fdim + j];
 }
-void set_fm_elem(fm_t* fm, float value, int channel, int i, int j){
+void set_fm_elem(fm_t* fm, cl_short value, int channel, int i, int j){
     fm->values[channel*fm->fsize + i*fm->fdim + j] = value;
 }
 
@@ -169,7 +204,8 @@ void print_fm(fm_t* fm, int n){
         printf("----Channel %d\n", n);
         for(int i=0; i<fm->fdim; ++i){
             for(int j=0; j<fm->fdim; ++j){
-                printf("%3.2f ", get_fm_elem(fm, n, i, j));
+                // TODO print one uchar than 1/other_uchar
+                printf("%d ", get_fm_elem(fm, n, i, j));
             }
             printf("\n");
         }

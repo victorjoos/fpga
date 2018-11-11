@@ -1,26 +1,76 @@
 #include "config.h"
 
-/*float get_fm_elem(__global const float* fm, int channel, int i, int j, int fdim, int fsize){
-    if((i<0)||(j<0)||(i>=fdim)||(j>=fdim)) return 0.0f;
-    return fm[channel*fsize + i*fdim + j];
+__kernel void pe_ff( const int first,
+                const int conv_size_in, const int conv_size_out,
+                const int ksize, const int strides, 
+                const int fdim_in, const int fdim_out,
+                __global const uchar* conv_kernel,
+                __global const short* fm_in, __global short* fm_out){
+    const int outf = get_global_id(0);
+    // printf("hello from conv\n");
+    // conv consts
+    const int zsize = conv_size_out;
+    const int ysize = zsize*conv_size_in;
+    const int xsize = ysize*ksize;         // TODO: avoid multiplication in kernel
+    const int offset = ksize/2;
+    
+    // fm consts
+    const int fsize_in = fdim_in*fdim_in; // TODO: avoid multiplication in kernel
+    const int fsize_out = fdim_out*fdim_out; // TODO: avoid multiplication in kernel
+    
+    for(int _i=(strides==2)?offset:0; _i<fdim_in; _i+=strides){
+        for(int _j=(strides==2)?offset:0; _j<fdim_in; _j+=strides){
+            int i = _i-offset; 
+            int j = _j-offset;
+            float acc = 0.0f;
+            for(int k=0; k<ksize; ++k){
+                for(int l=0; l<ksize; ++l){
+                    if((i+k<0)||(j+l<0)||(i+k>=fdim_in)||(j+l>=fdim_in)) continue; // element is out of bounds => 0
+                    uchar ck_elem = conv_kernel[k*xsize + l*ysize + inf*zsize + outf];
+                    if(ck_elem>>1) continue; // weight is zero so no computation is required
+                    for(int inf=0; inf<conv_size_in; ++inf){
+                        short fm_elem = fm_in[inf*fsize_in + (i+k)*fdim_in + (j+l)];
+                        if (first){ // fixed point
+                            if(!ck_elem) fm_elem = -fm_elem;
+                            acc += fm_elem;
+                        } else { // TODO: later on transform to double popcount (one for negatives, other one for positives)
+                            if(!ck_elem) fm_elem = -fm_elem;
+                            acc += fm_elem;
+                        }
+                    }
+                }
+            }
+            fm_out[outf*fsize_out + _i/strides*fdim_out + _j/strides] = acc;
+        }
+    }
 }
 
-void print_fm_test(__global const float* fm, int fdim, int fsize){
-    int n=0;
-    printf("----Channel %d x\n", n);
-        for(int i=0; i<fdim; ++i){
-            for(int j=0; j<fdim; ++j){
-                printf("%.2f ", get_fm_elem(fm, n, i, j, fdim, fsize));
-            }
-            printf("\n");
-        }
-}*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 __kernel void pe_ff( const int conv_size_in, const int conv_size_out,
                 const int ksize, const int strides, 
                 const int fdim_in, const int fdim_out,
-                __global const float* conv_kernel,
+                __global const uint8 * conv_kernel,
                 __global const float* fm_in, __global float* fm_out){
     const int outf = get_global_id(0);
     // printf("hello from conv\n");
@@ -53,6 +103,7 @@ __kernel void pe_ff( const int conv_size_in, const int conv_size_out,
         }
     }
 }
+
 
 __kernel void pe_tile_ff( const int conv_size_in, const int conv_size_out,
                 const int ksize, const int strides, 

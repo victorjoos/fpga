@@ -27,6 +27,7 @@ class Bn():
         print(self.beta.shape[0])
         self.sizes = np.array([self.beta.shape[0]]).astype(np.int32).tobytes()
         sve = self.gamma/np.sqrt(self.var + 1e-3)
+        print(self.beta - (self.mean*sve))
         self.all = [self.beta - (self.mean*sve), sve]
         
 class Conv():

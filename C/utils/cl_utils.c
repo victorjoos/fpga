@@ -76,11 +76,11 @@ int init_cl(char* file_name){
 	// Create fm-buffers
 	for (int i=0; i<NMB_FM; ++i) {
 		space->fm_fpga_buffers[i] = clCreateBuffer(space->context, CL_MEM_ALLOC_HOST_PTR, 
-					sizeof(float) * MAX_FM_SIZE, NULL, &ret);
+					sizeof(cl_short) * MAX_FM_SIZE, NULL, &ret);
 		checkError(ret, "Failed to create buffer");
 		assert (space->fm_fpga_buffers[i] != NULL);
-		space->fm_buffers[i] = (float*) clEnqueueMapBuffer(space->queue, space->fm_fpga_buffers[i], 
-					CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(float) * MAX_FM_SIZE, 0, NULL, NULL, &ret);
+		space->fm_buffers[i] = (cl_short*) clEnqueueMapBuffer(space->queue, space->fm_fpga_buffers[i], 
+					CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(cl_short) * MAX_FM_SIZE, 0, NULL, NULL, &ret);
 		checkError(ret, "Failed to map shared memory");
 		assert (space->fm_buffers[i] != NULL);
 		space->taken[i] = 0;
@@ -102,9 +102,9 @@ int load_kernel(char* kernel_name,
 
 void free_cl(cl_kernel * kernels){
     for (int i=0; i<NMB_FM; ++i) {
-		clReleaseMemObject(space->fm_fpga_buffers[i]);
 		clEnqueueUnmapMemObject (space->queue, space->fm_fpga_buffers[i], 
 					(void*)space->fm_buffers[i], 0, NULL, NULL);
+		clReleaseMemObject(space->fm_fpga_buffers[i]);
 	}
     cl_int ret;
     ret = clFlush(space->queue);

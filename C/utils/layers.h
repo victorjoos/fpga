@@ -10,7 +10,7 @@
 // } layer_t;
 
 
-fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_kernel* kernels);
+fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, int first, cl_kernel* kernels);
 fm_t* fully_connect(dense_t* dense, fm_t* fm_in);
 fm_t* avg_pool(fm_t* fm_in);
 // are in place!!

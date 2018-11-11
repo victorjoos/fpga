@@ -69,7 +69,8 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
         // First non-residual block
         fm_t* fm_prev = fm;
         activation_t act_type = TERNARY;
-        fm = convolve(resnet->convs[0], fm, 1, conv_kernels); free_fm(fm_prev);
+        fm = convolve(resnet->convs[0], fm, 1, CL_TRUE, conv_kernels); free_fm(fm_prev);
+        // todo: add shift to first normalizer >> 8!!!
         fm = normalize(resnet->bns[0], fm);
         fm = activate(fm, act_type);
         
@@ -84,11 +85,11 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
             for(int bl=0; bl<resnet->nblocks; ++bl){
                 // Main block C->BN->Act->C->BN->Act
                 int strides = (st>0 && bl==0)? 2: 1;
-                fm = convolve(resnet->convs[conv_index], fm, strides, conv_kernels); ++conv_index;
+                fm = convolve(resnet->convs[conv_index], fm, strides, CL_FALSE, conv_kernels); ++conv_index;
                 fm = normalize(resnet->bns[bn_index], fm); ++bn_index;
                 fm = activate(fm, act_type);
                 fm_prev = fm;
-                fm = convolve(resnet->convs[conv_index], fm, 1, conv_kernels); ++conv_index; free_fm(fm_prev);
+                fm = convolve(resnet->convs[conv_index], fm, 1, CL_FALSE, conv_kernels); ++conv_index; free_fm(fm_prev);
                 fm = normalize(resnet->bns[bn_index], fm); ++bn_index;
                 fm = activate(fm, act_type);
                 
@@ -99,7 +100,7 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
                     // shortcut with dim reduction between stacks
                     fm_prev = fm_shortcut;
                     fm_shortcut = convolve(resnet->convs[short_conv_index], 
-                                            fm_shortcut, 2, conv_kernels);
+                                            fm_shortcut, 2, CL_FALSE, conv_kernels);
                     free_fm(fm_prev);
                     fm_shortcut = normalize(resnet->bns[bn_index], fm_shortcut); ++bn_index;
                     fm_shortcut = activate(fm_shortcut, act_type);

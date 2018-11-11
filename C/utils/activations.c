@@ -25,7 +25,7 @@ float ter_htanh(float x){
     // else if (x<0)    ret = -1.f;
     // else             ret =  1.f;
     if(x<0.f){
-        if(x>-0.5f) ret =  0.f;
+        if(x>=-0.5f) ret =  0.f;
         else        ret = -1.f;
     } else {
         if(x<=0.5f) ret =  0.f;
