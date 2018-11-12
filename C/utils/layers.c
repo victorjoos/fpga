@@ -18,30 +18,23 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, int first, cl_kernel* ker
     cl_kernel _kernel = (strides==1 && conv->xsize==3)? kernels[0]: kernels[0];
 
     cl_int ret; int _karg = 0;
-    ret = clSetKernelArg(_kernel, ++_karg, sizeof(int),    (void *)&(first));      checkError(ret, "Failed to set args");
-    ret = clSetKernelArg(_kernel, ++_karg, sizeof(int),    (void *)&(conv->size_in));      checkError(ret, "Failed to set args");
-    ret = clSetKernelArg(_kernel, ++_karg, sizeof(int),    (void *)&(conv->size_out));     checkError(ret, "Failed to set args");
-    ret = clSetKernelArg(_kernel, ++_karg, sizeof(int),    (void *)&(conv->xsize));        checkError(ret, "Failed to set args");
-    ret = clSetKernelArg(_kernel, ++_karg, sizeof(int),    (void *)&(strides));            checkError(ret, "Failed to set args");
-    ret = clSetKernelArg(_kernel, ++_karg, sizeof(int),    (void *)&(fm_in->fdim));        checkError(ret, "Failed to set args");
-    ret = clSetKernelArg(_kernel, ++_karg, sizeof(int),    (void *)&(fm_out->fdim));       checkError(ret, "Failed to set args");
-    ret = clSetKernelArg(_kernel, ++_karg, sizeof(cl_mem), (void *)&(conv->fpga_kernel));  checkError(ret, "Failed to set args");
-    ret = clSetKernelArg(_kernel, ++_karg, sizeof(cl_mem), (void *)&(fm_in->fpga_values)); checkError(ret, "Failed to set args");
-    ret = clSetKernelArg(_kernel, ++_karg, sizeof(cl_mem), (void *)&(fm_out->fpga_values));checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(first));      checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(conv->size_in));      checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(conv->size_out));     checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(conv->xsize));        checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(strides));            checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(fm_in->fdim));        checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(fm_out->fdim));       checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(_kernel, _karg++, sizeof(cl_mem), (void *)&(conv->fpga_kernel));  checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(_kernel, _karg++, sizeof(cl_mem), (void *)&(fm_in->fpga_values)); checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(_kernel, _karg++, sizeof(cl_mem), (void *)&(fm_out->fpga_values));checkError(ret, "Failed to set args");
 
     // Execute the OpenCL kernel
     cl_event event;
-    if(_kernel == kernels[1]){
-        size_t global_size[2] = {(size_t) fm_in->fdim, (size_t) fm_in->fdim};
-        size_t local_size[2] = {(size_t) TILE_SIZE, (size_t) TILE_SIZE};
-        ret = clEnqueueNDRangeKernel(space->queue, _kernel, 2, NULL,
-                global_size, local_size, 0, NULL, &event);
-    }else{
-        size_t global_size = (size_t) conv->size_out;
-        size_t local_size = (size_t) 8;
-        ret = clEnqueueNDRangeKernel(space->queue, _kernel, 1, NULL,
-                &global_size, &local_size, 0, NULL, &event);
-    }
+    size_t global_size = (size_t) conv->size_out;
+    size_t local_size = (size_t) 8;
+    ret = clEnqueueNDRangeKernel(space->queue, _kernel, 1, NULL,
+            &global_size, &local_size, 0, NULL, &event);
     checkError(ret, "Failed enqueing kernel");
     // printf("%d, %d\n", ret, CL_SUCCESS);
     // printf("kernel started\n" );
@@ -96,16 +89,19 @@ fm_t* apply_f(fm_t* fm_in, cl_short(*f)(cl_short)){
 fm_t* activate(fm_t* fm_in, activation_t activ){
     cl_short (*f)(cl_short);
     switch(activ){
-        case RELU: f = act_relu; break;
-        case LEAKYRELU: f = leaky_relu; break;
-        case TANH: f = act_tanh; break;
-        case BINARY: f = bin_htanh; break;
+        // case RELU: f = act_relu; break;
+        // case LEAKYRELU: f = leaky_relu; break;
+        // case TANH: f = act_tanh; break;
+        // case BINARY: f = bin_htanh; break;
         case TERNARY: f = ter_htanh; break;
-        default:  f = act_relu;
+        default:  f = ter_htanh;
     }
     return apply_f(fm_in, f);
 }
-cl_short __div(cl_short x) {return x/2;}
+cl_short __div(cl_short x) {
+    x = x << 8;
+    return x/2;
+}
 fm_t* divide(fm_t* fm_in){
     return apply_f(fm_in, __div);
 }
@@ -117,15 +113,29 @@ fm_t* add(fm_t* fm_in1, fm_t* fm_in2){
         fm_in1->values[i] += fm_in2->values[i];
     return fm_in1;
 }
-fm_t* normalize(bn_t* bn, fm_t* fm_in){
+fm_t* normalize(bn_t* bn, fm_t* fm_in, int first){
     assert(bn->size == fm_in->nchannels);
-    float* values = fm_in->values;
+    cl_short* values = fm_in->values;
     for(int n=0; n<fm_in->nchannels; ++n){
-        float beta = bn->beta[n];
-        float gamma = bn->gamma[n];
+        cl_short beta = bn->beta[n];
+        cl_char gamma = bn->gamma[n];
+        cl_char gsign = bn->gamma_sign[n];
         for(int i=0; i<fm_in->fsize; ++i){
-            float x = *values;
-            *values = x * gamma + beta;
+            cl_short x = *values;
+            cl_ushort ux = abs(x);
+            cl_char xsign =(x==0)?0: x/abs(x);
+            if(!first)  ux = ux << 8;
+            if(gamma<0) ux = ux >> (cl_uchar)(-gamma);
+            else        ux = ux << (cl_uchar)gamma;
+
+            
+            *values = ux;
+            if(xsign != gsign) *values = -*values;
+            *values += beta;
+            // cl_short vsign = (*values) / abs(*values);
+            // cl_ushort uv = abs(*values);
+            // uv = uv >> 8
+            
             ++values;
         }
     }

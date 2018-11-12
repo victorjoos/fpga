@@ -103,7 +103,7 @@ dense_t * read_dense(char* filename){
     
     // read remaining values
     int kernel_size = dense->size_in*dense->size_out;
-    float* values;
+    cl_uchar* values;
     dense->fpga_kernel = alloc_shared_buffer_uchar(kernel_size, &values);
     float * _values = (float*)malloc(sizeof(float)*kernel_size);
     fread(_values, sizeof(float), kernel_size, fp);
@@ -134,9 +134,7 @@ bn_t * read_bn(char* filename){
     bn->beta = values;
     for(int i=0; i<bn->size; ++i) {
         // TODO: add alert in case beta is too big
-        values[i] = (cl_ushort) fabsf(roundf(_values[i]*256.f));
-        // MSB is sign bit
-        if (_values[i]<0.f) values[i] |= 0x8000;
+        values[i] = (cl_ushort) roundf(_values[i]*256.f);
     }
     bn->gamma = (cl_uchar*) (bn->beta + bn->size);
     bn->gamma_sign = bn->gamma + bn->size;

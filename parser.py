@@ -12,9 +12,10 @@ def ternarize(x, plop=[]):
     ones = np.ones_like(W).astype('float32')
     zeros = np.zeros_like(W).astype('float32')
     Wt = np.where(W>cutoff, ones, np.where(W<=-cutoff, -ones, zeros))
-    if len(plop)==0:
-        plop.append(5)
-        print(Wt)
+    print(f"Got a sparsity of: {np.sum(Wt==0) / np.multiply.reduce(Wt.shape):.3f} ")
+    # if len(plop)==0:
+    #     plop.append(5)
+    #     print(Wt)
     return Wt
 
 

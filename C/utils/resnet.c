@@ -56,9 +56,8 @@ resnet_t* build_resnet(int nblocks, char* dir){
 
 double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
     cl_int ret;
-    cl_kernel conv_kernels[2];
+    cl_kernel conv_kernels[1];
     load_kernel("pe_ff", &conv_kernels[0]);
-    load_kernel("pe_tile_ff", &conv_kernels[1]);
 
     int ok = 0;
     const int n_stacks=3;
@@ -70,8 +69,7 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
         fm_t* fm_prev = fm;
         activation_t act_type = TERNARY;
         fm = convolve(resnet->convs[0], fm, 1, CL_TRUE, conv_kernels); free_fm(fm_prev);
-        // todo: add shift to first normalizer >> 8!!!
-        fm = normalize(resnet->bns[0], fm);
+        fm = normalize(resnet->bns[0], fm, 1);
         fm = activate(fm, act_type);
         
         fm_t* fm_shortcut = fm;
@@ -86,11 +84,11 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
                 // Main block C->BN->Act->C->BN->Act
                 int strides = (st>0 && bl==0)? 2: 1;
                 fm = convolve(resnet->convs[conv_index], fm, strides, CL_FALSE, conv_kernels); ++conv_index;
-                fm = normalize(resnet->bns[bn_index], fm); ++bn_index;
+                fm = normalize(resnet->bns[bn_index], fm, 0); ++bn_index;
                 fm = activate(fm, act_type);
                 fm_prev = fm;
                 fm = convolve(resnet->convs[conv_index], fm, 1, CL_FALSE, conv_kernels); ++conv_index; free_fm(fm_prev);
-                fm = normalize(resnet->bns[bn_index], fm); ++bn_index;
+                fm = normalize(resnet->bns[bn_index], fm, 0); ++bn_index;
                 fm = activate(fm, act_type);
                 
                 // Update indices (not very beautyful but easier than recalculating)
@@ -102,7 +100,7 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
                     fm_shortcut = convolve(resnet->convs[short_conv_index], 
                                             fm_shortcut, 2, CL_FALSE, conv_kernels);
                     free_fm(fm_prev);
-                    fm_shortcut = normalize(resnet->bns[bn_index], fm_shortcut); ++bn_index;
+                    fm_shortcut = normalize(resnet->bns[bn_index], fm_shortcut, 0); ++bn_index;
                     fm_shortcut = activate(fm_shortcut, act_type);
                 }
 
