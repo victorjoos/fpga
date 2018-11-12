@@ -8,6 +8,10 @@
 const int IMSIZE = IMDIM*IMDIM*IMCHANNEL;
 unsigned char* read_images(char* filename) {
     FILE *fileptr = fopen(filename, "rb");
+    if (fileptr==NULL) {
+        printf("no images\n");
+        exit(-1);
+    }
     size_t filelen = (IMSIZE + 1) * 10000; // image size + label
     unsigned char* buffer = (unsigned char*) malloc(filelen * sizeof(unsigned char));
     fread(buffer, sizeof(unsigned char), filelen, fileptr);
@@ -53,6 +57,10 @@ conv_t * read_conv(char* filename){
 
     // read sizes
     FILE* fp = fopen(filename, "rb");
+    if (fp==NULL) {
+        printf("no dataset");
+        exit(-1);
+    }
     int sizes[3];
     fread(sizes, sizeof(int), 3, fp);
     conv->xsize = sizes[0];
@@ -74,6 +82,10 @@ dense_t * read_dense(char* filename){
 
     // read sizes
     FILE* fp = fopen(filename, "rb");
+    if (fp==NULL) {
+        printf("no dataset");
+        exit(-1);
+    }
     int sizes[2];
     fread(sizes, sizeof(int), 2, fp);
     dense->size_in = sizes[0];
@@ -93,6 +105,10 @@ bn_t * read_bn(char* filename){
 
     // read sizes
     FILE* fp = fopen(filename, "rb");
+    if (fp==NULL) {
+        printf("no dataset");
+        exit(-1);
+    }
     int sizes[1];
     fread(sizes, sizeof(int), 1, fp);
     bn->size = sizes[0];

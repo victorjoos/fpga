@@ -18,6 +18,7 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_kernel* kernels){
     cl_kernel _kernel = (strides==1 && conv->xsize==3)? kernels[0]: kernels[0];
 
     cl_int ret;
+    printf("values: %d, %d, %d\n", conv->xsize, fm_in->fdim, fm_out->fdim);
     ret = clSetKernelArg(_kernel, 0, sizeof(int),    (void *)&(conv->size_in));      checkError(ret, "Failed to set args");       
     ret = clSetKernelArg(_kernel, 1, sizeof(int),    (void *)&(conv->size_out));     checkError(ret, "Failed to set args");        
     ret = clSetKernelArg(_kernel, 2, sizeof(int),    (void *)&(conv->xsize));        checkError(ret, "Failed to set args");     
@@ -36,17 +37,17 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_kernel* kernels){
         ret = clEnqueueNDRangeKernel(space->queue, _kernel, 2, NULL,
                 global_size, local_size, 0, NULL, &event);
     }else{
-        size_t global_size = (size_t) conv->size_out;
-        size_t local_size = (size_t) 8;
-        ret = clEnqueueNDRangeKernel(space->queue, _kernel, 1, NULL,
-                &global_size, &local_size, 0, NULL, &event);
+        printf("Hello world\n");
+        //size_t global_size = (size_t) conv->size_out;
+        //size_t local_size = (size_t) 8;
+        ret = clEnqueueTask(space->queue, _kernel, 0, NULL, &event);
     }
     checkError(ret, "Failed enqueing kernel");
     // printf("%d, %d\n", ret, CL_SUCCESS);
     // printf("kernel started\n" );
     ret = clWaitForEvents(1, &event);
     checkError(ret, "Failed waiting for events");
-    // printf("kernel finished\n");
+    printf("kernel finished\n");
 
     return fm_out;
 }

@@ -58,7 +58,7 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
     cl_int ret;
     cl_kernel conv_kernels[2];
     load_kernel("pe_ff", &conv_kernels[0]);
-    load_kernel("pe_tile_ff", &conv_kernels[1]);
+    load_kernel("pe_ff", &conv_kernels[1]);
 
     int ok = 0;
     const int n_stacks=3;
@@ -67,9 +67,12 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
         unsigned char img_class = img[0];
         fm_t* fm = img_to_fm(img);
         // First non-residual block
+        print_fm(fm, 0);
         fm_t* fm_prev = fm;
         activation_t act_type = LEAKYRELU;
         fm = convolve(resnet->convs[0], fm, 1, conv_kernels); free_fm(fm_prev);
+        print_fm(fm, 0);
+        // return 0;
         fm = normalize(resnet->bns[0], fm);
         fm = activate(fm, act_type);
         fm_t* fm_shortcut = fm;

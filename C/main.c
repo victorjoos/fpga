@@ -38,7 +38,7 @@ int main( int argc, char * argv[]){
     #ifndef FPGA_BUILD
     init_cl("kernels/pe_ff.cl");
     #else
-    init_cl("pe_ff.aocx");
+    init_cl("pe_ff_emu.aocx");
     #endif
     unsigned char* dataset = read_images("../datasets/test_batch.bin");
     resnet_t* resnet = build_resnet(3, "../test2/");
