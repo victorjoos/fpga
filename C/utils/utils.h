@@ -51,8 +51,8 @@ bn_t * read_bn(char* filename);
 fm_t* alloc_fm(int nchannels, int fdim);
 fm_t* img_to_fm(unsigned char* img);
 
-void print_fm(fm_t* fm, int n);
-
+void print_fm(fm_t* fm, int n, int fixed_point);
+void print_fm_sum(fm_t* fm, int fixed_point);
 
 void free_conv(conv_t* conv);
 void free_dense(dense_t* dense);

@@ -120,6 +120,9 @@ fm_t* normalize(bn_t* bn, fm_t* fm_in, int first){
         cl_short beta = bn->beta[n];
         cl_char gamma = bn->gamma[n];
         cl_char gsign = bn->gamma_sign[n];
+        if(n==14){
+            printf("%d => %d, %d, %d\n",n, beta, gamma, gsign);
+        }
         for(int i=0; i<fm_in->fsize; ++i){
             cl_short x = *values;
             cl_ushort ux = abs(x);
@@ -132,9 +135,6 @@ fm_t* normalize(bn_t* bn, fm_t* fm_in, int first){
             *values = ux;
             if(xsign != gsign) *values = -*values;
             *values += beta;
-            // cl_short vsign = (*values) / abs(*values);
-            // cl_ushort uv = abs(*values);
-            // uv = uv >> 8
             
             ++values;
         }
