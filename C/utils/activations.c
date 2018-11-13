@@ -26,7 +26,7 @@ cl_short ter_htanh(cl_short x){
     // else if (x<0)    ret = -1.f;
     // else             ret =  1.f;
     if(x<0){
-        if( x > -((cl_short)0x80) ) ret =  0;
+        if( x >= -((cl_short)0x80) ) ret =  0;
         else         ret = -1;
     } else {
         if( x >= ((cl_short)0x80) ) ret =  1;

@@ -69,11 +69,8 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
         fm_t* fm_prev = fm;
         activation_t act_type = TERNARY;
         fm = convolve(resnet->convs[0], fm, 1, CL_TRUE, conv_kernels); free_fm(fm_prev);
+        // print_fm(fm, 1, CL_TRUE);
         fm = normalize(resnet->bns[0], fm, 1);
-        print_fm(fm, 14, CL_TRUE);
-        // print_fm(fm, 5, CL_TRUE);
-        print_fm_sum(fm, CL_TRUE);
-        return 0;
         fm = activate(fm, act_type);
         fm_t* fm_shortcut = fm;
 
@@ -87,7 +84,6 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
                 // Main block C->BN->Act->C->BN->Act
                 int strides = (st>0 && bl==0)? 2: 1;
                 fm = convolve(resnet->convs[conv_index], fm, strides, CL_FALSE, conv_kernels); ++conv_index;
-                return 0;
                 fm = normalize(resnet->bns[bn_index], fm, 0); ++bn_index;
                 fm = activate(fm, act_type);
                 fm_prev = fm;
@@ -117,6 +113,8 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
                              
             }
         }
+        print_fm_sum(fm, CL_FALSE);
+        return 0;
         fm_prev = fm;
         fm = avg_pool(fm); free_fm(fm_prev); fm_prev = fm;
         fm = fully_connect(resnet->denses[0], fm); free_fm(fm_prev);

@@ -146,7 +146,7 @@ bn_t * read_bn(char* filename){
         // 8bits for exponent
         bn->gamma[i] = (cl_char) l2;
         // 8bits for sign (TODO: optimise??)
-        bn->gamma_sign[i] = (_values[i]<0.f)? 1: 0;
+        bn->gamma_sign[i] = (_values[_i]<0.f)? 1: 0;
     }
     fclose(fp);
     free(_values);
@@ -221,9 +221,9 @@ void print_fm(fm_t* fm, int n, int fixed_point){
         }
 }
 void print_fm_sum(fm_t* fm, int fixed_point){
-    float ftotal = 0.f;
-    int total = 0;
     for(int n=0;n<fm->nchannels; ++n){
+        float ftotal = 0.f;
+        int total = 0;
         for(int i=0; i<fm->fdim; ++i){
             for(int j=0; j<fm->fdim; ++j){
                 cl_short fe = get_fm_elem(fm, n, i, j);
@@ -241,9 +241,9 @@ void print_fm_sum(fm_t* fm, int fixed_point){
                 }
             }
         }
+        if(fixed_point) printf("float cs: %.3f\n", ftotal);
+        else            printf("int cs: %d\n", total);
     }
-    if(fixed_point) printf("float cs: %.3f\n", ftotal);
-    else            printf("int cs: %.3f\n", total);
 }
 
 void free_conv(conv_t* conv){
