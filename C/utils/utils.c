@@ -138,14 +138,15 @@ bn_t * read_bn(char* filename){
     }
     bn->gamma = (cl_uchar*) (bn->beta + bn->size);
     bn->gamma_sign = bn->gamma + bn->size;
-    for(int i=bn->size; i<2*bn->size; ++i) {
+    for(int i=0, _i=bn->size; i<bn->size; ++i, ++_i) {
         // TODO: add alert in case gamma exponent is too big
-        float l2 = roundf(log2f(fabsf(_values[i])));
+        float l2 = log2f(fabsf(_values[_i]));
+        l2 = roundf(l2);
         l2 = fminf(fmaxf(l2, -128.f), +127.f);
         // 8bits for exponent
-        values[i] = (cl_char) l2;
+        bn->gamma[i] = (cl_char) l2;
         // 8bits for sign (TODO: optimise??)
-        bn->gamma[i] = (_values[i]<0.f)? 0: 1;
+        bn->gamma_sign[i] = (_values[i]<0.f)? 0: 1;
     }
     fclose(fp);
     free(_values);
@@ -198,12 +199,23 @@ void set_fm_elem(fm_t* fm, cl_short value, int channel, int i, int j){
     fm->values[channel*fm->fsize + i*fm->fdim + j] = value;
 }
 
-void print_fm(fm_t* fm, int n){
+void print_fm(fm_t* fm, int n, int fixed_point){
         printf("----Channel %d\n", n);
         for(int i=0; i<fm->fdim; ++i){
             for(int j=0; j<fm->fdim; ++j){
-                // TODO print one uchar than 1/other_uchar
-                printf("%d ", get_fm_elem(fm, n, i, j));
+                cl_short fe = get_fm_elem(fm, n, i, j);
+                if(fixed_point){
+                    float ffe = (float)(fe>>8);
+                    fe &= 0xff;
+                    for(int i=1; i<9; ++i){
+                        int on = (fe&0x80)>>7;
+                        ffe += on*powf(2, -i);
+                        fe = fe<<1;
+                    }                
+                    printf("%.3f ", ffe);
+                } else {
+                    printf("%d ", fe);
+                }
             }
             printf("\n");
         }
