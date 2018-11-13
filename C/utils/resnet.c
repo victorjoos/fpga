@@ -87,6 +87,7 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
                 // Main block C->BN->Act->C->BN
                 int strides = (st>0 && bl==0)? 2: 1;
                 fm = convolve(resnet->convs[conv_index], fm, strides, conv_kernels); ++conv_index;
+                if (bl==0) print_fm(fm, 0);
                 fm = normalize(resnet->bns[bn_index], fm); ++bn_index;
                 fm = activate(fm, act_type);
                 fm_prev = fm;

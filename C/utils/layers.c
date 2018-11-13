@@ -38,9 +38,12 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, cl_kernel* kernels){
                 global_size, local_size, 0, NULL, &event);
     }else{
         printf("Hello world\n");
-        //size_t global_size = (size_t) conv->size_out;
-        //size_t local_size = (size_t) 8;
+        size_t global_size = (size_t) conv->size_out;
+        size_t local_size = (size_t) 8;
         ret = clEnqueueTask(space->queue, _kernel, 0, NULL, &event);
+        // ret = clEnqueueNDRangeKernel(space->queue, _kernel, 1, NULL,
+        //          &global_size, &local_size, 0, NULL, &event);
+
     }
     checkError(ret, "Failed enqueing kernel");
     // printf("%d, %d\n", ret, CL_SUCCESS);

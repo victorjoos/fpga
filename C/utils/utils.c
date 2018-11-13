@@ -198,6 +198,6 @@ void free_bn(bn_t* bn){
 void free_fm(fm_t* fm){
     // clEnqueueUnmapMemObject (space->queue, fm->fpga_values, fm->values, 0, NULL, NULL);
     // clReleaseMemObject (fm->fpga_values);
-    free(fm);
     space->taken[fm->mem_buff_channel] = 0;
+    free(fm);
 }
