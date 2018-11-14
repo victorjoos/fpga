@@ -69,7 +69,6 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
         fm_t* fm_prev = fm;
         activation_t act_type = TERNARY;
         fm = convolve(resnet->convs[0], fm, 1, CL_TRUE, conv_kernels); free_fm(fm_prev);
-        // print_fm(fm, 1, CL_TRUE);
         fm = normalize(resnet->bns[0], fm, 1);
         fm = activate(fm, act_type);
         fm_t* fm_shortcut = fm;
@@ -113,8 +112,6 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
                              
             }
         }
-        print_fm_sum(fm, CL_FALSE);
-        return 0;
         fm_prev = fm;
         fm = avg_pool(fm); free_fm(fm_prev); fm_prev = fm;
         fm = fully_connect(resnet->denses[0], fm); free_fm(fm_prev);
@@ -126,7 +123,7 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
             if(maxval<fmv){
                 maxval = fmv;
                 maxi = (char) i;
-            }
+            } 
         }
         free_fm(fm);
         printf("Expected %d and got %d\n", img_class, maxi);

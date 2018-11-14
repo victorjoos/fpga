@@ -99,8 +99,8 @@ fm_t* activate(fm_t* fm_in, activation_t activ){
     return apply_f(fm_in, f);
 }
 cl_short __div(cl_short x) {
-    x = x << 8;
-    return x/2;
+    // x = x << 8;
+    return x<<7;
 }
 fm_t* divide(fm_t* fm_in){
     return apply_f(fm_in, __div);
@@ -120,9 +120,7 @@ fm_t* normalize(bn_t* bn, fm_t* fm_in, int first){
         cl_short beta = bn->beta[n];
         cl_char gamma = bn->gamma[n];
         cl_char gsign = bn->gamma_sign[n];
-        if(n==1){
-            printf("%d => %d, %d, %d\n",n, beta, gamma, gsign);
-        }
+        
         for(int i=0; i<fm_in->fsize; ++i){
             cl_short x = *values;
             cl_ushort ux = abs(x);

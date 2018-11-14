@@ -21,7 +21,7 @@ __kernel void pe_ff( const int first,
         for(int _j=(strides==2)?offset:0; _j<fdim_in; _j+=strides){
             int i = _i-offset; 
             int j = _j-offset;
-            float acc = 0.0f;
+            short acc = 0;
             for(int k=0; k<ksize; ++k){
                 for(int l=0; l<ksize; ++l){
                     for(int inf=0; inf<conv_size_in; ++inf){
