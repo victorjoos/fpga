@@ -1,5 +1,116 @@
 #include "config.h"
 
+#define TR 4 // use TR == TC ?
+#define TC 4
+#define TOUT 1
+#define TIN 64
+#define MAX_KSIZE 3
+
+__kernel void pe_ff(const int first,
+                const int conv_size_in, const int conv_size_out,
+                const int ksize, const int strides, 
+                const int fdim_in, const int fdim_out,
+                __global const uchar* conv_kernel,
+                __global const short* fm_in, __global short* fm_out){
+
+    // printf("[KERNEL] ksize: %d, strides: %d, conv_size_in: %d, conv_size_out: %d, fdim_in: %d, fdim_out: %d\n", ksize, strides, conv_size_in, conv_size_out, fdim_in, fdim_out);
+    const int zsize = conv_size_out;
+    const int ysize = zsize*conv_size_in;
+    const int xsize = ysize*ksize; 
+    const int offset = ksize/2;
+    short l_out_fmap[TR][TC][TOUT];
+
+    
+    const int fsize_in = fdim_in*fdim_in; // TODO: avoid multiplication in kernel
+    const int fsize_out = fdim_out*fdim_out; // TODO: avoid multiplication in kernel
+    const int max_conv_size = ksize*ksize*conv_size_in*conv_size_out;
+    for (int row=(strides==2)?0:-offset; row<fdim_in-offset; row += TR) {
+        for (int col=(strides==2)?0:-offset; col<fdim_in-offset; col += TC) {
+            for (int outf=0; outf<conv_size_out; outf += TOUT) {
+                for (int inf=0; inf<conv_size_in; inf += TIN) {
+                    // load memory here ...
+                    uchar l_weights[MAX_KSIZE][MAX_KSIZE][TOUT][TIN];
+                    short l_fmap[TR+MAX_KSIZE-1][TC+MAX_KSIZE-1][TIN];
+                    // Load weights
+                    for (int k=0; k<ksize; ++k) {
+                        for (int l=0; l<ksize; ++l) {
+                            for (int too=outf, _too=0; too<min(outf+TOUT, conv_size_out); ++too, ++_too) {
+                                for (int tii=inf, _tii=0; tii<min(inf+TIN, conv_size_in); ++tii, ++_tii) {
+                                    uchar fmap = conv_kernel[k*xsize + l*ysize + tii*zsize + too];
+                                    l_weights[k][l][_too][_tii] = fmap;
+                                }
+                            }
+                        }
+                    }
+
+                    // Load fmaps
+                    for (int trr=row, _trr=0; trr<min(row+TR+ksize-1, fdim_in+offset); ++trr, ++_trr) {
+                        for (int tcc=col, _tcc=0; tcc<min(col+TC+ksize-1, fdim_in+offset); ++tcc, ++_tcc) {
+                            for (int tii=inf, _tii=0; tii<min(inf+TIN, conv_size_in); ++tii, ++_tii) {
+                                short fm_elem;
+                                if((trr<0)||(tcc<0)||(trr>=fdim_in)||(tcc>=fdim_in)) fm_elem = 0;
+                                else fm_elem = fm_in[tii*fsize_in + (trr)*fdim_in + (tcc)];
+                                l_fmap[_trr][_tcc][_tii] = fm_elem;
+                            }
+                        }
+                    }
+                    for (int trr=row, _trr=0; trr<min(row+TR, fdim_in+offset); ++trr, ++_trr) {
+                        for (int tcc=col, _tcc=0; tcc<min(col+TC, fdim_in+offset); ++tcc, ++_tcc) {
+                            for (int too=outf, _too=0; too<min(outf+TOUT, conv_size_out); ++too, ++_too) {
+                                l_out_fmap[_trr][_tcc][_too] = 0;
+                            }
+                        }
+                    }
+
+                    // Convolution
+                    for (int k=0; k<ksize; ++k) {
+                        for (int l=0; l<ksize; ++l) {
+                            for (int trr=row, _trr=0; trr<min(row+TR, fdim_in-offset) && _trr<TR; trr+=strides, _trr+=strides) {
+                                for (int tcc=col, _tcc=0; tcc<min(col+TC, fdim_in-offset) && _tcc<TC; tcc+=strides, _tcc+=strides) {
+                                    for (int too=outf, _too=0; too<min(outf+TOUT, conv_size_out); ++too, ++_too) {
+                                        for (int tii=inf, _tii=0; tii<min(inf+TIN, conv_size_in); ++tii, ++_tii) {
+                                            // l_out_fmap[_trr][_tcc][_too] += l_fmap[_trr+k][_tcc+l][_tii] * l_weights[k][l][_too][_tii];
+                                            uchar ck_elem = l_weights[k][l][_too][_tii];
+                                            if(ck_elem>>1) continue; // weight is zero so no computation is required
+                                            short fm_elem = l_fmap[_trr+k][_tcc+l][_tii];
+                                            if (first){ // fixed point
+                                                if(!ck_elem) fm_elem = -fm_elem;
+                                                l_out_fmap[_trr][_tcc][_too] += fm_elem;
+                                            } else { // TODO: later on transform to double popcount (one for negatives, other one for positives)
+                                                if(!ck_elem) fm_elem = -fm_elem;
+                                                l_out_fmap[_trr][_tcc][_too] += fm_elem;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    int _offset = (strides==2)?0:offset;
+                    // Store in output fmap
+                    for (int trr=row/strides, _trr=0; trr<min(row+TR, fdim_out-offset) && _trr<TR; ++trr, _trr+=strides) {
+                        for (int tcc=col/strides, _tcc=0; tcc<min(col+TC, fdim_out-offset) && _tcc<TC; ++tcc, _tcc+=strides) {
+                            for (int too=outf, _too=0; too<min(outf+TOUT, conv_size_out); ++too, ++_too) {
+                                if(inf==0) {
+                                    short fm_elem = l_out_fmap[_trr][_tcc][_too];
+                                    fm_out[too*fsize_out + (trr+_offset)*fdim_out + (tcc+_offset)] = fm_elem; 
+                                } else {
+                                    fm_out[too*fsize_out + (trr+_offset)*fdim_out + (tcc+_offset)] += l_out_fmap[_trr][_tcc][_too];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+
+
+/*
 __kernel void pe_ff( const int first,
                 const int conv_size_in, const int conv_size_out,
                 const int ksize, const int strides, 
@@ -42,7 +153,7 @@ __kernel void pe_ff( const int first,
             fm_out[outf*fsize_out + _i/strides*fdim_out + _j/strides] = acc;
         }
     }
-}
+} */
 
 /*
 __kernel void pe_tile_ff( const int conv_size_in, const int conv_size_out,
