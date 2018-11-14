@@ -15,10 +15,10 @@ void print_fm_test(__global const float* fm, int fdim, int fsize){
             printf("\n");
         }
 }*/
-#define TR 4 // use TR == TC ?
-#define TC 4
-#define TOUT 2
-#define TIN 2
+#define TR 5 // use TR == TC ?
+#define TC 5
+#define TOUT 1
+#define TIN 64
 #define MAX_KSIZE 3
 
 __kernel void pe_ff(const int conv_size_in, const int conv_size_out,
@@ -40,8 +40,8 @@ __kernel void pe_ff(const int conv_size_in, const int conv_size_out,
     const int fsize_out = fdim_out*fdim_out; // TODO: avoid multiplication in kernel
     const int max_conv_size = ksize*ksize*conv_size_in*conv_size_out;
     // printf("hello !: %d, %d, %d, %d\n", max_conv_size, ksize, conv_size_in, conv_size_out);
-    for (int row=-offset; row<fdim_in-offset; row += TR) {
-        for (int col=-offset; col<fdim_in-offset; col += TC) {
+    for (int row=(strides==2)?0:-offset; row<fdim_in-offset; row += TR) {
+        for (int col=(strides==2)?0:-offset; col<fdim_in-offset; col += TC) {
             for (int outf=0; outf<conv_size_out; outf += TOUT) {
                 for (int inf=0; inf<conv_size_in; inf += TIN) {
                     // load memory here ...
@@ -107,7 +107,7 @@ __kernel void pe_ff(const int conv_size_in, const int conv_size_out,
                             }
                         }
                     }
-                    // if (strides==2) {
+                    // if (strides==2 & inf==0) {
                     // printf("inf: %d, row=%d, col=%d\n", inf, row, col);
                     // for (int trr=0; trr<TR; ++trr) {
                     //     for (int tcc=0; tcc<TC; ++tcc) {
@@ -117,17 +117,18 @@ __kernel void pe_ff(const int conv_size_in, const int conv_size_out,
                     // }
                     // printf("\n");
                     // }
+                    int _offset = (strides==2)?0:offset;
                     // Store in output fmap
-                    for (int trr=row, _trr=0; trr<min(row+TR, fdim_in-offset); ++trr, _trr+=strides) {
-                        for (int tcc=col, _tcc=0; tcc<min(col+TC, fdim_in-offset); ++tcc, _tcc+=strides) {
+                    for (int trr=row, _trr=0; trr<min(row+TR, fdim_out-2*offset) && _trr<TR; ++trr, _trr+=strides) {
+                        for (int tcc=col, _tcc=0; tcc<min(col+TC, fdim_out-2*offset) && _tcc<TC; ++tcc, _tcc+=strides) {
                             for (int too=outf, _too=0; too<min(outf+TOUT, conv_size_out); ++too, ++_too) {
-                                if (strides==2 && (_trr%2 != 0 || _tcc%2 != 0)) {
-                                    printf("[ERROR] this is not good !!");
-                                }
-                                    if(inf==0)
-                                        fm_out[too*fsize_out + (trr+offset)*fdim_out + (tcc+offset)] = l_out_fmap[_trr][_tcc][_too];
-                                    else
-                                        fm_out[too*fsize_out + (trr+offset)*fdim_out + (tcc+offset)] += l_out_fmap[_trr][_tcc][_too];
+                                    //if (inf==0) printf("%d, %d, %d\n", _trr, _tcc, _too);
+                                    if(inf==0) {
+                                        float fm_elem = l_out_fmap[_trr][_tcc][_too];
+                                        fm_out[too*fsize_out + (trr+_offset)*fdim_out + (tcc+_offset)] = fm_elem; 
+                                    } else {
+                                        fm_out[too*fsize_out + (trr+_offset)*fdim_out + (tcc+_offset)] += l_out_fmap[_trr][_tcc][_too];
+                                    }
                             }
                         }
                     }
