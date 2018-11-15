@@ -33,7 +33,6 @@ int main( int argc, char * argv[]){
     */
 
     timer_t timer;
-    start_timer(&timer);
     space = (cl_space_t *) malloc(sizeof(struct opencl_space));
     #ifndef FPGA_BUILD
     init_cl("kernels/pe_ff.cl");
@@ -43,6 +42,7 @@ int main( int argc, char * argv[]){
     unsigned char* dataset = read_images("../datasets/test_batch.bin");
     resnet_t* resnet = build_resnet(3, "../test2/");
     int n = 10;
+    start_timer(&timer);
     float acc = infer_resnet(resnet, dataset, n);
     printf("%.4f accuracy on %d images\n", acc, n);
     free_resnet(resnet);

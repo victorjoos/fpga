@@ -1,17 +1,17 @@
-#include "config.h"
+// #include "config.h"
 
-#define TR 8 // use TR == TC ?
-#define TC 8
-#define TOUT 16
-#define TIN 16
+#define TR 4 // use TR == TC ?
+#define TC 4
+#define TOUT 2
+#define TIN  2
 #define MAX_KSIZE 3
 
 __kernel void pe_ff(const int first,
                 const int conv_size_in, const int conv_size_out,
                 const int ksize, const int strides, 
                 const int fdim_in, const int fdim_out,
-                __global const uchar* conv_kernel,
-                __global const short* fm_in, __global short* fm_out){
+                __global const uchar* restrict conv_kernel,
+                __global const short* restrict fm_in, __global short* restrict fm_out){
 
     // printf("[KERNEL] ksize: %d, strides: %d, conv_size_in: %d, conv_size_out: %d, fdim_in: %d, fdim_out: %d\n", ksize, strides, conv_size_in, conv_size_out, fdim_in, fdim_out);
     const int zsize = conv_size_out;
@@ -62,26 +62,24 @@ __kernel void pe_ff(const int first,
                         }
                     }
 
+                    bool is_strided = (strides==2);
                     // Convolution
                     for (int k=0; k<ksize; ++k) {
                         for (int l=0; l<ksize; ++l) {
-                            for (int too=outf, _too=0; too<min(outf+TOUT, conv_size_out); ++too, ++_too) {
+                            // #pragma unroll
+                            for (int too=outf, _too=0; _too<TOUT; ++too, ++_too) {
                                 for (int tii=inf, _tii=0; tii<min(inf+TIN, conv_size_in); ++tii, ++_tii) {
                                     uchar ck_elem = l_weights[k][l][_too][_tii];
                                     if(ck_elem>>1) continue; // weight is zero so no computation is required
-                                    #pragma unroll
-                                    for (int trr=row, _trr=0; _trr<TR; trr+=strides, _trr+=strides) { //trr<min(row+TR, fdim_in-offset) -> not necessary condition
-                                        #pragma unroll
-                                        for (int tcc=col, _tcc=0; _tcc<TC; tcc+=strides, _tcc+=strides) { // tcc<min(col+TC, fdim_in-offset) -> not necessary condition
-                                                // l_out_fmap[_trr][_tcc][_too] += l_fmap[_trr+k][_tcc+l][_tii] * l_weights[k][l][_too][_tii];
-                                                short fm_elem = l_fmap[_trr+k][_tcc+l][_tii];
-                                                // if (first){ // fixed point
-                                                //     if(!ck_elem) fm_elem = -fm_elem;
-                                                //     l_out_fmap[_trr][_tcc][_too] += fm_elem;
-                                                // } else { // TODO: later on transform to double popcount (one for negatives, other one for positives)
+                                    // #pragma unroll
+                                    for (int trr=row, _trr=0; _trr<TR; trr+=1, _trr+=1) { //trr<min(row+TR, fdim_in-offset) -> not necessary condition
+                                        // #pragma unroll
+                                        for (int tcc=col, _tcc=0; _tcc<TC; tcc+=1, _tcc+=1) { // tcc<min(col+TC, fdim_in-offset) -> not necessary conditio
+                                                if(1){//!is_strided || (!(trr&0b1) && !(tcc&0b1))){
+                                                    short fm_elem = l_fmap[_trr+k][_tcc+l][_tii];
                                                     if(!ck_elem) fm_elem = -fm_elem;
                                                     l_out_fmap[_trr][_tcc][_too] += fm_elem;
-                                                // }
+                                                }
                                         }
                                     }
                                 }
