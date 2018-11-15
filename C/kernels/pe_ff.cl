@@ -18,24 +18,34 @@ __kernel void pe_ff(const int first,
     const int ysize = zsize*conv_size_in;
     const int xsize = ysize*ksize; 
     const int offset = ksize/2;
-    short l_out_fmap[TR][TC][TOUT];
 
     
     const int fsize_in = fdim_in*fdim_in; // TODO: avoid multiplication in kernel
     const int fsize_out = fdim_out*fdim_out; // TODO: avoid multiplication in kernel
     const int max_conv_size = ksize*ksize*conv_size_in*conv_size_out;
-    for (int row=(strides==2)?0:-offset; row<fdim_in-offset; row += TR) {
-        for (int col=(strides==2)?0:-offset; col<fdim_in-offset; col += TC) {
+    const bool is_strided = (strides==2);
+    const int _offset = (is_strided)?0:offset;
+    __local short l_out_fmap[TOUT][TR][TC];
+    __local uchar l_weights[MAX_KSIZE][MAX_KSIZE][TOUT][TIN];
+    __local short l_fmap[TIN][TR+MAX_KSIZE-1][TC+MAX_KSIZE-1];
+    for (int row=(is_strided)?0:-offset; row<fdim_in-offset; row += TR) {
+        for (int col=(is_strided)?0:-offset; col<fdim_in-offset; col += TC) {
             for (int outf=0; outf<conv_size_out; outf += TOUT) {
+                // Load psums here
+                for (int _trr=0; _trr<TR; ++_trr) {
+                    for (int _tcc=0; _tcc<TC; ++_tcc) {
+                        for (int _too=0; _too<TOUT; ++_too) {
+                            l_out_fmap[_trr][_tcc][_too] = 0;
+                        }
+                    }
+                }
                 for (int inf=0; inf<conv_size_in; inf += TIN) {
                     // load memory here ...
-                    uchar l_weights[MAX_KSIZE][MAX_KSIZE][TOUT][TIN];
-                    short l_fmap[TR+MAX_KSIZE-1][TC+MAX_KSIZE-1][TIN];
                     // Load weights
                     for (int k=0; k<ksize; ++k) {
                         for (int l=0; l<ksize; ++l) {
-                            for (int too=outf, _too=0; too<min(outf+TOUT, conv_size_out); ++too, ++_too) {
-                                for (int tii=inf, _tii=0; tii<min(inf+TIN, conv_size_in); ++tii, ++_tii) {
+                            for (int tii=inf, _tii=0; tii<min(inf+TIN, conv_size_in); ++tii, ++_tii) {
+                                for (int too=outf, _too=0; too<min(outf+TOUT, conv_size_out); ++too, ++_too) {
                                     uchar fmap = conv_kernel[k*xsize + l*ysize + tii*zsize + too];
                                     l_weights[k][l][_too][_tii] = fmap;
                                 }
@@ -44,44 +54,33 @@ __kernel void pe_ff(const int first,
                     }
 
                     // Load fmaps
-                    for (int trr=row, _trr=0; trr<min(row+TR+ksize-1, fdim_in+offset); ++trr, ++_trr) {
-                        for (int tcc=col, _tcc=0; tcc<min(col+TC+ksize-1, fdim_in+offset); ++tcc, ++_tcc) {
-                            for (int tii=inf, _tii=0; tii<min(inf+TIN, conv_size_in); ++tii, ++_tii) {
+                    for (int tii=inf, _tii=0; tii<min(inf+TIN, conv_size_in); ++tii, ++_tii) {
+                        for (int trr=row, _trr=0; trr<min(row+TR+ksize-1, fdim_in+offset); ++trr, ++_trr) {
+                            for (int tcc=col, _tcc=0; tcc<min(col+TC+ksize-1, fdim_in+offset); ++tcc, ++_tcc) {
                                 short fm_elem;
                                 if((trr<0)||(tcc<0)||(trr>=fdim_in)||(tcc>=fdim_in)) fm_elem = 0;
                                 else fm_elem = fm_in[tii*fsize_in + (trr)*fdim_in + (tcc)];
-                                l_fmap[_trr][_tcc][_tii] = fm_elem;
-                            }
-                        }
-                    }
-                    const int _offset = (strides==2)?0:offset;
-                    for (int trr=row/strides, _trr=0; trr<min(row+TR, fdim_out-offset) && _trr<TR; ++trr, _trr+=strides) {
-                        for (int tcc=col/strides, _tcc=0; tcc<min(col+TC, fdim_out-offset) && _tcc<TC; ++tcc, _tcc+=strides) {
-                            for (int too=outf, _too=0; too<min(outf+TOUT, conv_size_out); ++too, ++_too) {
-                                short fm_elem = (inf==0)?0:fm_out[too*fsize_out + (trr+_offset)*fdim_out + (tcc+_offset)];
-                                l_out_fmap[_trr][_tcc][_too] = fm_elem;
+                                l_fmap[_tii][_trr][_tcc] = fm_elem;
                             }
                         }
                     }
 
-                    bool is_strided = (strides==2);
                     // Convolution
                     for (int k=0; k<ksize; ++k) {
                         for (int l=0; l<ksize; ++l) {
                             #pragma unroll 1
-                            for (int too=outf, _too=0; _too<TOUT; ++too, ++_too) {
+                            for (int _too=0; _too<TOUT; ++_too) {
                                 for (int tii=inf, _tii=0; tii<min(inf+TIN, conv_size_in); ++tii, ++_tii) {
                                     uchar ck_elem = l_weights[k][l][_too][_tii];
-                                    if(ck_elem>>1) continue; // weight is zero so no computation is required
-                                    #pragma unroll 1
-                                    for (int trr=row, _trr=0; _trr<TR; trr+=1, _trr+=1) { //trr<min(row+TR, fdim_in-offset) -> not necessary condition
+                                    if(!(ck_elem>>1)){  // weight is zero so no computation is required
                                         #pragma unroll 1
-                                        for (int tcc=col, _tcc=0; _tcc<TC; tcc+=1, _tcc+=1) { // tcc<min(col+TC, fdim_in-offset) -> not necessary conditio
-                                                if(1){//!is_strided || (!(trr&0b1) && !(tcc&0b1))){
-                                                    short fm_elem = l_fmap[_trr+k][_tcc+l][_tii];
-                                                    if(!ck_elem) fm_elem = -fm_elem;
-                                                    l_out_fmap[_trr][_tcc][_too] += fm_elem;
-                                                }
+                                        for (int _trr=0; _trr<TR; ++_trr) { //trr<min(row+TR, fdim_in-offset) -> not necessary condition
+                                            #pragma unroll 1
+                                            for (int _tcc=0; _tcc<TC; ++_tcc) { // tcc<min(col+TC, fdim_in-offset) -> not necessary conditio
+                                                short fm_elem = l_fmap[_tii][_trr+k][_tcc+l];
+                                                if(!ck_elem) fm_elem = -fm_elem;
+                                                l_out_fmap[_too][_trr][_tcc] += fm_elem;
+                                            }
                                         }
                                     }
                                 }
@@ -89,17 +88,13 @@ __kernel void pe_ff(const int first,
                         }
                     }
 
-                    // Store in output fmap
+                }
+                // Store in output fmap
+                for (int too=outf, _too=0; too<min(outf+TOUT, conv_size_out); ++too, ++_too) {
                     for (int trr=row/strides, _trr=0; trr<min(row+TR, fdim_out-offset) && _trr<TR; ++trr, _trr+=strides) {
                         for (int tcc=col/strides, _tcc=0; tcc<min(col+TC, fdim_out-offset) && _tcc<TC; ++tcc, _tcc+=strides) {
-                            for (int too=outf, _too=0; too<min(outf+TOUT, conv_size_out); ++too, ++_too) {
-                                // if(inf==0) {
-                                short fm_elem = l_out_fmap[_trr][_tcc][_too];
-                                fm_out[too*fsize_out + (trr+_offset)*fdim_out + (tcc+_offset)] = fm_elem; 
-                                // } else {
-                                //     fm_out[too*fsize_out + (trr+_offset)*fdim_out + (tcc+_offset)] += l_out_fmap[_trr][_tcc][_too];
-                                // }
-                            }
+                            short fm_elem = l_out_fmap[_too][_trr][_tcc];
+                            fm_out[too*fsize_out + (trr+_offset)*fdim_out + (tcc+_offset)] = fm_elem; 
                         }
                     }
                 }
