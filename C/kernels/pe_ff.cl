@@ -1,9 +1,9 @@
 #include "config.h"
 
-#define TR 4 // use TR == TC ?
-#define TC 4
-#define TOUT 1
-#define TIN 64
+#define TR 8 // use TR == TC ?
+#define TC 8
+#define TOUT 16
+#define TIN 16
 #define MAX_KSIZE 3
 
 __kernel void pe_ff(const int first,
@@ -65,21 +65,23 @@ __kernel void pe_ff(const int first,
                     // Convolution
                     for (int k=0; k<ksize; ++k) {
                         for (int l=0; l<ksize; ++l) {
-                            for (int trr=row, _trr=0; trr<min(row+TR, fdim_in-offset) && _trr<TR; trr+=strides, _trr+=strides) {
-                                for (int tcc=col, _tcc=0; tcc<min(col+TC, fdim_in-offset) && _tcc<TC; tcc+=strides, _tcc+=strides) {
-                                    for (int too=outf, _too=0; too<min(outf+TOUT, conv_size_out); ++too, ++_too) {
-                                        for (int tii=inf, _tii=0; tii<min(inf+TIN, conv_size_in); ++tii, ++_tii) {
-                                            // l_out_fmap[_trr][_tcc][_too] += l_fmap[_trr+k][_tcc+l][_tii] * l_weights[k][l][_too][_tii];
-                                            uchar ck_elem = l_weights[k][l][_too][_tii];
-                                            if(ck_elem>>1) continue; // weight is zero so no computation is required
-                                            short fm_elem = l_fmap[_trr+k][_tcc+l][_tii];
-                                            if (first){ // fixed point
-                                                if(!ck_elem) fm_elem = -fm_elem;
-                                                l_out_fmap[_trr][_tcc][_too] += fm_elem;
-                                            } else { // TODO: later on transform to double popcount (one for negatives, other one for positives)
-                                                if(!ck_elem) fm_elem = -fm_elem;
-                                                l_out_fmap[_trr][_tcc][_too] += fm_elem;
-                                            }
+                            for (int too=outf, _too=0; too<min(outf+TOUT, conv_size_out); ++too, ++_too) {
+                                for (int tii=inf, _tii=0; tii<min(inf+TIN, conv_size_in); ++tii, ++_tii) {
+                                    uchar ck_elem = l_weights[k][l][_too][_tii];
+                                    if(ck_elem>>1) continue; // weight is zero so no computation is required
+                                    #pragma unroll
+                                    for (int trr=row, _trr=0; _trr<TR; trr+=strides, _trr+=strides) { //trr<min(row+TR, fdim_in-offset) -> not necessary condition
+                                        #pragma unroll
+                                        for (int tcc=col, _tcc=0; _tcc<TC; tcc+=strides, _tcc+=strides) { // tcc<min(col+TC, fdim_in-offset) -> not necessary condition
+                                                // l_out_fmap[_trr][_tcc][_too] += l_fmap[_trr+k][_tcc+l][_tii] * l_weights[k][l][_too][_tii];
+                                                short fm_elem = l_fmap[_trr+k][_tcc+l][_tii];
+                                                // if (first){ // fixed point
+                                                //     if(!ck_elem) fm_elem = -fm_elem;
+                                                //     l_out_fmap[_trr][_tcc][_too] += fm_elem;
+                                                // } else { // TODO: later on transform to double popcount (one for negatives, other one for positives)
+                                                    if(!ck_elem) fm_elem = -fm_elem;
+                                                    l_out_fmap[_trr][_tcc][_too] += fm_elem;
+                                                // }
                                         }
                                     }
                                 }
