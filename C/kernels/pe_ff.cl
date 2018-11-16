@@ -40,14 +40,19 @@ __kernel void pe_ff(const int first,
                 }
 
 
+                const int __too_limit = min(TOUT, conv_size_out-outf);
                 for (int inf=0; inf<conv_size_in; inf += TIN) {
                     // load memory here ...
                     // Load weights
+                    const int _tii_limit = min(TIN,  conv_size_in-inf);
+                    const int _too_limit = __too_limit;
                     for (int k=0; k<ksize; ++k) {
                         for (int l=0; l<ksize; ++l) {
-                            for (int tii=inf, _tii=0; tii<min(inf+TIN, conv_size_in); ++tii, ++_tii) {
-                                for (int too=outf, _too=0; too<min(outf+TOUT, conv_size_out); ++too, ++_too) {
-                                    uchar fmap = conv_kernel[k*xsize + l*ysize + tii*zsize + too];
+                            for (int tii=inf, _tii=0; _tii<TIN; ++tii, ++_tii) {
+                                for (int too=outf, _too=0; _too<TOUT; ++too, ++_too) {
+                                    uchar fmap;
+                                    if(_too<_too_limit && _tii<_tii_limit) fmap = conv_kernel[k*xsize + l*ysize + tii*zsize + too];
+                                    else fmap = 0;
                                     l_weights[k][l][_too][_tii] = fmap;
                                 }
                             }
@@ -55,30 +60,40 @@ __kernel void pe_ff(const int first,
                     }
 
                     // Load fmaps
-                    for (int tii=inf, _tii=0; tii<min(inf+TIN, conv_size_in); ++tii, ++_tii) {
-                        for (int trr=row, _trr=0; trr<min(row+TR+ksize-1, fdim_in+offset); ++trr, ++_trr) {
-                            for (int tcc=col, _tcc=0; tcc<min(col+TC+ksize-1, fdim_in+offset); ++tcc, ++_tcc) {
-                                short fm_elem;
-                                if((trr<0)||(tcc<0)||(trr>=fdim_in)||(tcc>=fdim_in)) fm_elem = 0;
-                                else fm_elem = fm_in[tii*fsize_in + (trr)*fdim_in + (tcc)];
-                                l_fmap[_tii][_trr][_tcc] = fm_elem;
+                    const int _trr_limit = min(TR+ksize-1, fdim_in+offset-row);
+                    const int _tcc_limit = min(TC+ksize-1, fdim_in+offset-col);
+                    for (int tii=inf, _tii=0; _tii<TIN; ++tii, ++_tii) {
+                        if(_tii<_tii_limit){
+                            for (int trr=row, _trr=0; _trr<TR+MAX_KSIZE-1; ++trr, ++_trr) {
+                                if(_trr<_trr_limit){
+                                    for (int tcc=col, _tcc=0; _tcc<TC+MAX_KSIZE-1; ++tcc, ++_tcc) {
+                                        if(_tcc<_tcc_limit){
+                                            short fm_elem;
+                                            if((trr<0)||(tcc<0)||(trr>=fdim_in)||(tcc>=fdim_in)) fm_elem = 0;
+                                            else fm_elem = fm_in[tii*fsize_in + (trr)*fdim_in + (tcc)];
+                                            l_fmap[_tii][_trr][_tcc] = fm_elem;
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
 
                     // Convolution
-                    const int _tii_limit = min(TIN, conv_size_in-inf);
+                    const int _tii_limit_copy = _tii_limit; //necessary???
                     for (int k=0; k<ksize; ++k) {
                         for (int l=0; l<ksize; ++l) {
                             for (int _too=0; _too<TOUT; ++_too) {
-                                for (int _tii=0; _tii<_tii_limit; ++_tii) {
-                                    uchar ck_elem = l_weights[k][l][_too][_tii];
-                                    if(!(ck_elem>>1)){ // weight is zero so no computation is required
-                                        for (int _trr=0; _trr<TR; ++_trr) {
-                                            for (int _tcc=0; _tcc<TC; ++_tcc) {
-                                                short fm_elem = l_fmap[_tii][_trr+k][_tcc+l];
-                                                if(!ck_elem) fm_elem = -fm_elem;
-                                                l_out_fmap[_too][_trr][_tcc] += fm_elem;
+                                for (int _tii=0; _tii<TIN; ++_tii) {
+                                    if(_tii<_tii_limit_copy){
+                                        uchar ck_elem = l_weights[k][l][_too][_tii];
+                                        if(~(ck_elem>>1)&0b1){ // weight is zero so no computation is required
+                                            for (int _trr=0; _trr<TR; ++_trr) {
+                                                for (int _tcc=0; _tcc<TC; ++_tcc) {
+                                                    short fm_elem = l_fmap[_tii][_trr+k][_tcc+l];
+                                                    if(!ck_elem) fm_elem = -fm_elem;
+                                                    l_out_fmap[_too][_trr][_tcc] += fm_elem;
+                                                }
                                             }
                                         }
                                     }
@@ -89,13 +104,16 @@ __kernel void pe_ff(const int first,
                 }
 
 
-                const int _offset = (is_strided)?0:offset;
                 // Store in output fmap
-                for (int too=outf, _too=0; too<min(outf+TOUT, conv_size_out); ++too, ++_too) {
-                    for (int trr=row/strides, _trr=0; trr<min(row+TR, fdim_out-offset) && _trr<TR; ++trr, _trr+=strides) {
-                        for (int tcc=col/strides, _tcc=0; tcc<min(col+TC, fdim_out-offset) && _tcc<TC; ++tcc, _tcc+=strides) {
-                            short fm_elem = l_out_fmap[_too][_trr][_tcc];
-                            fm_out[too*fsize_out + (trr+_offset)*fdim_out + (tcc+_offset)] = fm_elem; 
+                const int _offset = (is_strided)?0:offset;
+                const int _too_limit_copy = __too_limit;
+                for (int too=outf, _too=0; _too<TOUT; ++too, ++_too) {
+                    if(_too<_too_limit_copy){
+                        for (int trr=row/strides, _trr=0; trr<min(row+TR, fdim_out-offset) && _trr<TR; ++trr, _trr+=strides) {
+                            for (int tcc=col/strides, _tcc=0; tcc<min(col+TC, fdim_out-offset) && _tcc<TC; ++tcc, _tcc+=strides) {
+                                short fm_elem = l_out_fmap[_too][_trr][_tcc];
+                                fm_out[too*fsize_out + (trr+_offset)*fdim_out + (tcc+_offset)] = fm_elem; 
+                            }
                         }
                     }
                 }
