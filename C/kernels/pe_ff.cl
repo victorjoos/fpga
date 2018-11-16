@@ -1,9 +1,9 @@
 // #include "config.h"
 
-#define TR 8 // use TR == TC ?
-#define TC 8
-#define TOUT 4
-#define TIN  4
+#define TR 4 // use TR == TC ?
+#define TC 4
+#define TOUT 2
+#define TIN  2
 #define MAX_KSIZE 3
 
 __kernel void pe_ff(const int first,
@@ -12,7 +12,7 @@ __kernel void pe_ff(const int first,
                 const int fdim_in, const int fdim_out,
                 __global const uchar* restrict conv_kernel,
                 __global const short* restrict fm_in, __global short* restrict fm_out){
-    printf("[KERNEL] ksize: %d, strides: %d, conv_size_in: %d, conv_size_out: %d, fdim_in: %d, fdim_out: %d\n", ksize, strides, conv_size_in, conv_size_out, fdim_in, fdim_out);
+    // printf("[KERNEL] ksize: %d, strides: %d, conv_size_in: %d, conv_size_out: %d, fdim_in: %d, fdim_out: %d\n", ksize, strides, conv_size_in, conv_size_out, fdim_in, fdim_out);
     const int zsize = conv_size_out;
     const int ysize = zsize*conv_size_in;
     const int xsize = ysize*ksize; 
@@ -70,16 +70,12 @@ __kernel void pe_ff(const int first,
                     const int _tii_limit = min(TIN, conv_size_in-inf);
                     for (int k=0; k<ksize; ++k) {
                         for (int l=0; l<ksize; ++l) {
-                            // #pragma unroll
                             for (int _too=0; _too<TOUT; ++_too) {
-                                // #pragma unroll 1
                                 for (int _tii=0; _tii<_tii_limit; ++_tii) {
                                     uchar ck_elem = l_weights[k][l][_too][_tii];
-                                    if(~(ck_elem>>1)){  // weight is zero so no computation is required
-                                        // #pragma unroll 2
-                                        for (int _trr=0; _trr<TR; ++_trr) { //trr<min(row+TR, fdim_in-offset) -> not necessary condition
-                                            // #pragma unroll 1
-                                            for (int _tcc=0; _tcc<TC; ++_tcc) { // tcc<min(col+TC, fdim_in-offset) -> not necessary conditio
+                                    if(!(ck_elem>>1)){ // weight is zero so no computation is required
+                                        for (int _trr=0; _trr<TR; ++_trr) {
+                                            for (int _tcc=0; _tcc<TC; ++_tcc) {
                                                 short fm_elem = l_fmap[_tii][_trr+k][_tcc+l];
                                                 if(!ck_elem) fm_elem = -fm_elem;
                                                 l_out_fmap[_too][_trr][_tcc] += fm_elem;
@@ -103,12 +99,9 @@ __kernel void pe_ff(const int first,
                         }
                     }
                 }
-
-
             }
         }
     }
-            printf("hey\n");
 }
 
 
