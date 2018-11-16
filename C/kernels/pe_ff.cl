@@ -1,9 +1,9 @@
 // #include "config.h"
 
-#define TR 4 // use TR == TC ?
-#define TC 4
-#define TOUT 2
-#define TIN  2
+#define TR 8 // use TR == TC ?
+#define TC 8
+#define TOUT 4
+#define TIN  4
 #define MAX_KSIZE 3
 
 __kernel void pe_ff(const int first,
@@ -12,8 +12,7 @@ __kernel void pe_ff(const int first,
                 const int fdim_in, const int fdim_out,
                 __global const uchar* restrict conv_kernel,
                 __global const short* restrict fm_in, __global short* restrict fm_out){
-
-    // printf("[KERNEL] ksize: %d, strides: %d, conv_size_in: %d, conv_size_out: %d, fdim_in: %d, fdim_out: %d\n", ksize, strides, conv_size_in, conv_size_out, fdim_in, fdim_out);
+    printf("[KERNEL] ksize: %d, strides: %d, conv_size_in: %d, conv_size_out: %d, fdim_in: %d, fdim_out: %d\n", ksize, strides, conv_size_in, conv_size_out, fdim_in, fdim_out);
     const int zsize = conv_size_out;
     const int ysize = zsize*conv_size_in;
     const int xsize = ysize*ksize; 
@@ -24,21 +23,23 @@ __kernel void pe_ff(const int first,
     const int fsize_out = fdim_out*fdim_out; // TODO: avoid multiplication in kernel
     const int max_conv_size = ksize*ksize*conv_size_in*conv_size_out;
     const bool is_strided = (strides==2);
-    const int _offset = (is_strided)?0:offset;
     __local short l_out_fmap[TOUT][TR][TC];
     __local uchar l_weights[MAX_KSIZE][MAX_KSIZE][TOUT][TIN];
     __local short l_fmap[TIN][TR+MAX_KSIZE-1][TC+MAX_KSIZE-1];
     for (int row=(is_strided)?0:-offset; row<fdim_in-offset; row += TR) {
         for (int col=(is_strided)?0:-offset; col<fdim_in-offset; col += TC) {
             for (int outf=0; outf<conv_size_out; outf += TOUT) {
+
                 // Load psums here
-                for (int _trr=0; _trr<TR; ++_trr) {
-                    for (int _tcc=0; _tcc<TC; ++_tcc) {
-                        for (int _too=0; _too<TOUT; ++_too) {
-                            l_out_fmap[_trr][_tcc][_too] = 0;
+                for (int _too=0; _too<TOUT; ++_too) {
+                    for (int _trr=0; _trr<TR; ++_trr) {
+                        for (int _tcc=0; _tcc<TC; ++_tcc) {
+                            l_out_fmap[_too][_trr][_tcc] = 0;
                         }
                     }
                 }
+
+
                 for (int inf=0; inf<conv_size_in; inf += TIN) {
                     // load memory here ...
                     // Load weights
@@ -66,16 +67,18 @@ __kernel void pe_ff(const int first,
                     }
 
                     // Convolution
+                    const int _tii_limit = min(TIN, conv_size_in-inf);
                     for (int k=0; k<ksize; ++k) {
                         for (int l=0; l<ksize; ++l) {
-                            #pragma unroll 1
+                            // #pragma unroll
                             for (int _too=0; _too<TOUT; ++_too) {
-                                for (int tii=inf, _tii=0; tii<min(inf+TIN, conv_size_in); ++tii, ++_tii) {
+                                // #pragma unroll 1
+                                for (int _tii=0; _tii<_tii_limit; ++_tii) {
                                     uchar ck_elem = l_weights[k][l][_too][_tii];
-                                    if(!(ck_elem>>1)){  // weight is zero so no computation is required
-                                        #pragma unroll 1
+                                    if(~(ck_elem>>1)){  // weight is zero so no computation is required
+                                        // #pragma unroll 2
                                         for (int _trr=0; _trr<TR; ++_trr) { //trr<min(row+TR, fdim_in-offset) -> not necessary condition
-                                            #pragma unroll 1
+                                            // #pragma unroll 1
                                             for (int _tcc=0; _tcc<TC; ++_tcc) { // tcc<min(col+TC, fdim_in-offset) -> not necessary conditio
                                                 short fm_elem = l_fmap[_tii][_trr+k][_tcc+l];
                                                 if(!ck_elem) fm_elem = -fm_elem;
@@ -87,8 +90,10 @@ __kernel void pe_ff(const int first,
                             }
                         }
                     }
-
                 }
+
+
+                const int _offset = (is_strided)?0:offset;
                 // Store in output fmap
                 for (int too=outf, _too=0; too<min(outf+TOUT, conv_size_out); ++too, ++_too) {
                     for (int trr=row/strides, _trr=0; trr<min(row+TR, fdim_out-offset) && _trr<TR; ++trr, _trr+=strides) {
@@ -98,9 +103,12 @@ __kernel void pe_ff(const int first,
                         }
                     }
                 }
+
+
             }
         }
     }
+            printf("hey\n");
 }
 
 
