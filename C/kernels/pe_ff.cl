@@ -109,9 +109,13 @@ __kernel void pe_ff(const int first,
                 // Store in output fmap
                 const int _offset = (is_strided)?0:offset;
                 const int _too_limit_copy = __too_limit;
+                const int _trr_low_limit = min(TR, fdim_in+offset-row);
+                const int _tcc_low_limit = min(TC, fdim_in+offset-col);
+                const int trr_save_start = (is_strided)?row/2:row;
+                const int tcc_save_start = (is_strided)?col/2:col;
                 for (int too=outf, _too=0; _too<TOUT; ++too, ++_too) {
-                        for (int trr=row/strides, _trr=0; trr<min(row+TR, fdim_out-offset) && _trr<TR; ++trr, _trr+=strides) {
-                            for (int tcc=col/strides, _tcc=0; tcc<min(col+TC, fdim_out-offset) && _tcc<TC; ++tcc, _tcc+=strides) {
+                        for (int trr=trr_save_start, _trr=0; _trr<_trr_low_limit; ++trr, _trr+=strides) {
+                            for (int tcc=tcc_save_start, _tcc=0; _tcc<_tcc_low_limit; ++tcc, _tcc+=strides) {
                     if(_too<_too_limit_copy){
                                 short fm_elem = l_out_fmap[_too][_trr][_tcc];
                                 fm_out[too*fsize_out + (trr+_offset)*fdim_out + (tcc+_offset)] = fm_elem; 
