@@ -25,13 +25,22 @@ __kernel void pe_ff(const int first,
     const int fsize_out = fdim_out*fdim_out; // TODO: avoid multiplication in kernel
     const int max_conv_size = ksize*ksize*conv_size_in*conv_size_out;
     const bool is_strided = (strides==2);
-    __local uchar all_weights[MAX_TOUT*MAX_TIN*MAX_KSIZE*MAX_KSIZE];
+    __local uchar all_weights[(MAX_TOUT*MAX_TIN*MAX_KSIZE*MAX_KSIZE)/2];
     __local short l_out_fmap[TOUT][TR][TC];
     __local uchar l_weights[MAX_KSIZE][MAX_KSIZE][TOUT][TIN];
     __local short l_fmap[TIN][TR+MAX_KSIZE-1][TC+MAX_KSIZE-1];
 
     const uint tot_wsize = conv_size_in*conv_size_out*ksize*ksize;
-    for(int mw=0; mw<tot_wsize; ++mw) all_weights[mw] = conv_kernel[mw]; 
+    uchar two_w = 0;
+    for(int mw=0; mw<tot_wsize; ++mw){
+        two_w |= conv_kernel[mw];
+        if((mw % 2) == 1){
+            all_weights[(mw>>1)] = two_w;
+            two_w = 0;
+        } else {
+            two_w = two_w << 4;
+        }
+    }
 
     for (int row=(is_strided)?0:-offset; row<fdim_in-offset; row += TR) {
         for (int col=(is_strided)?0:-offset; col<fdim_in-offset; col += TC) {
@@ -57,10 +66,17 @@ __kernel void pe_ff(const int first,
                         for (int l=0; l<ksize; ++l) {
                             for (int tii=inf, _tii=0; _tii<TIN; ++tii, ++_tii) {
                                 for (int too=outf, _too=0; _too<TOUT; ++too, ++_too) {
-                                    uchar fmap;
-                                    if(_too<_too_limit && _tii<_tii_limit) fmap = all_weights[k*xsize + l*ysize + tii*zsize + too];
-                                    else fmap = 0;
-                                    l_weights[k][l][_too][_tii] = fmap;
+                                    uchar welem;
+                                    if(_too<_too_limit && _tii<_tii_limit) {
+                                        int index = k*xsize + l*ysize + tii*zsize + too;
+                                        int get_at = index >> 1;
+                                        int shift_to = index & 0b1;
+                                        uchar got = all_weights[get_at];
+                                        got = got >> shift_to;
+                                        got = got & 0b11;
+                                        welem = got;
+                                    } else welem = 0;
+                                    l_weights[k][l][_too][_tii] = welem;
                                 }
                             }
                         }
