@@ -26,8 +26,10 @@ __kernel void pe_ff(const int first,
     __local short l_out_fmap[TOUT][TR][TC];
     __local uchar l_weights[MAX_KSIZE][MAX_KSIZE][TOUT][TIN];
     __local short l_fmap[TIN][TR+MAX_KSIZE-1][TC+MAX_KSIZE-1];
-    for (int row=(is_strided)?0:-offset; row<fdim_in-offset; row += TR) {
-        for (int col=(is_strided)?0:-offset; col<fdim_in-offset; col += TC) {
+    const int _start_rr_cc = (is_strided)?0:-offset;
+    const int _end_rr_cc = fdim_in-offset;
+    for (int row=_start_rr_cc; row<_end_rr_cc; row += TR) {
+        for (int col=_start_rr_cc; col<_end_rr_cc; col += TC) {
             for (int outf=0; outf<conv_size_out; outf += TOUT) {
 
                 // Load psums here
@@ -63,10 +65,10 @@ __kernel void pe_ff(const int first,
                     const int _trr_limit = min(TR+ksize-1, fdim_in+offset-row);
                     const int _tcc_limit = min(TC+ksize-1, fdim_in+offset-col);
                     for (int tii=inf, _tii=0; _tii<TIN; ++tii, ++_tii) {
-                        if(_tii<_tii_limit){
                             for (int trr=row, _trr=0; _trr<TR+MAX_KSIZE-1; ++trr, ++_trr) {
-                                if(_trr<_trr_limit){
                                     for (int tcc=col, _tcc=0; _tcc<TC+MAX_KSIZE-1; ++tcc, ++_tcc) {
+                        if(_tii<_tii_limit){
+                                if(_trr<_trr_limit){
                                         if(_tcc<_tcc_limit){
                                             short fm_elem;
                                             if((trr<0)||(tcc<0)||(trr>=fdim_in)||(tcc>=fdim_in)) fm_elem = 0;
@@ -85,11 +87,11 @@ __kernel void pe_ff(const int first,
                         for (int l=0; l<ksize; ++l) {
                             for (int _too=0; _too<TOUT; ++_too) {
                                 for (int _tii=0; _tii<TIN; ++_tii) {
-                                    if(_tii<_tii_limit_copy){
                                         uchar ck_elem = l_weights[k][l][_too][_tii];
-                                        if(~(ck_elem>>1)&0b1){ // weight is zero so no computation is required
                                             for (int _trr=0; _trr<TR; ++_trr) {
                                                 for (int _tcc=0; _tcc<TC; ++_tcc) {
+                                    if(_tii<_tii_limit_copy){
+                                        if(~(ck_elem>>1)&0b1){ // weight is zero so no computation is required
                                                     short fm_elem = l_fmap[_tii][_trr+k][_tcc+l];
                                                     if(!ck_elem) fm_elem = -fm_elem;
                                                     l_out_fmap[_too][_trr][_tcc] += fm_elem;
@@ -108,9 +110,9 @@ __kernel void pe_ff(const int first,
                 const int _offset = (is_strided)?0:offset;
                 const int _too_limit_copy = __too_limit;
                 for (int too=outf, _too=0; _too<TOUT; ++too, ++_too) {
-                    if(_too<_too_limit_copy){
                         for (int trr=row/strides, _trr=0; trr<min(row+TR, fdim_out-offset) && _trr<TR; ++trr, _trr+=strides) {
                             for (int tcc=col/strides, _tcc=0; tcc<min(col+TC, fdim_out-offset) && _tcc<TC; ++tcc, _tcc+=strides) {
+                    if(_too<_too_limit_copy){
                                 short fm_elem = l_out_fmap[_too][_trr][_tcc];
                                 fm_out[too*fsize_out + (trr+_offset)*fdim_out + (tcc+_offset)] = fm_elem; 
                             }
