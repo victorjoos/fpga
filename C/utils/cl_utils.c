@@ -109,7 +109,7 @@ void free_cl(cl_kernel * kernels){
     cl_int ret;
     ret = clFlush(space->queue);
     ret = clFinish(space->queue);
-    for(int i=0; i<1; ++i) clReleaseKernel(kernels[i]);
+    for(int i=0; i<2; ++i) clReleaseKernel(kernels[i]);
     ret = clReleaseProgram(space->program);
     ret = clReleaseCommandQueue(space->queue);
     ret = clReleaseContext(space->context);

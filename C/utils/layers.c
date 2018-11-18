@@ -15,7 +15,7 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, int first, cl_kernel* ker
     fm_t* fm_out = alloc_fm(conv->size_out, fm_in->fdim/strides);
 
     // set kernel arguments
-    cl_kernel _kernel = (strides==1 && conv->xsize==3)? kernels[0]: kernels[0];
+    cl_kernel _kernel = (strides==1 && conv->xsize==3)? kernels[1]: kernels[0];
 
     cl_int ret; int _karg = 0;
     ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(first));      checkError(ret, "Failed to set args");
@@ -31,16 +31,24 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, int first, cl_kernel* ker
 
     // Execute the OpenCL kernel
     cl_event event;
-    size_t global_size = (size_t) conv->size_out;
-    size_t local_size = (size_t) 8;
-    ret = clEnqueueTask(space->queue, _kernel, 0, NULL, &event);
-    // ret = clEnqueueNDRangeKernel(space->queue, _kernel, 1, NULL,
-    //         &global_size, &local_size, 0, NULL, &event);
+    if(_kernel == kernels[1]){
+        size_t global_size[2] = {(size_t) fm_in->fdim, (size_t) fm_in->fdim};
+        size_t local_size[2] = {(size_t) TILE_SIZE, (size_t) TILE_SIZE};
+        ret = clEnqueueNDRangeKernel(space->queue, _kernel, 2, NULL,
+                global_size, local_size, 0, NULL, &event);
+    }else{
+        size_t global_size = (size_t) conv->size_out;
+        size_t local_size = (size_t) 8;
+        ret = clEnqueueTask(space->queue, _kernel, 0, NULL, &event);
+        // ret = clEnqueueNDRangeKernel(space->queue, _kernel, 1, NULL,
+        //         &global_size, &local_size, 0, NULL, &event);
+    }
     checkError(ret, "Failed enqueing kernel");
     // printf("%d, %d\n", ret, CL_SUCCESS);
     // printf("kernel started\n" );
     ret = clWaitForEvents(1, &event);
     checkError(ret, "Failed waiting for events");
+    clReleaseEvent(event);
     // printf("kernel finished\n");
 
     return fm_out;

@@ -127,8 +127,74 @@ __kernel void pe_ff(const int first,
         }
     }
 }
+#define TILE_SIZE 4
 
+__kernel void pe_tile_ff(const int first,
+                const int conv_size_in, const int conv_size_out,
+                const int ksize, const int strides, 
+                const int fdim_in, const int fdim_out,
+                __global const uchar* restrict conv_kernel,
+                __global const short* restrict fm_in, __global short* restrict fm_out){
 
+    // conv consts
+    const int zsize = conv_size_out;
+    const int ysize = zsize*conv_size_in;
+    const int xsize = ysize*ksize;         // TODO: avoid multiplication in kernel
+    const int offset = ksize/2;
+    
+    // fm consts
+    const int fsize_in = fdim_in*fdim_in; // TODO: avoid multiplication in kernel
+    const int fsize_out = fdim_out*fdim_out; // TODO: avoid multiplication in kernel
+
+    const int local_i = get_local_id(0);
+    const int local_j = get_local_id(1);
+    const int global_i = TILE_SIZE*get_group_id(0) + local_i;
+    const int global_j = TILE_SIZE*get_group_id(1)+ local_j;
+
+    __local short fm_in_local[TILE_SIZE+MAX_KSIZE-1][TILE_SIZE+MAX_KSIZE-1];
+    __local uchar kern_in_local[MAX_KSIZE][MAX_KSIZE];
+    short acc;
+
+    const int n_tiles = conv_size_out/TILE_SIZE;
+    for(int outf=0; outf<conv_size_out; ++outf){
+        acc = 0;
+        for(int inf=0; inf<conv_size_in; ++inf){
+            // Load into shared memory
+            int ii = TILE_SIZE*get_group_id(0) + 2*local_i - 1;
+            int jj = TILE_SIZE*get_group_id(1) + 2*local_j - 1;
+            for(int li=0; li<2; ++li){
+                for(int lj=0; lj<2; ++lj){
+                    if(2*local_i+li>=TILE_SIZE+2) continue;
+                    if(2*local_j+lj>=TILE_SIZE+2) continue;
+
+                    short fm_elem;
+                    if((ii+li<0)||(jj+lj<0)||(ii+li>=fdim_in)||(jj+lj>=fdim_in)) fm_elem = 0;
+                    else fm_elem = fm_in[inf*fsize_in + (ii+li)*fdim_in + (jj+lj)];
+                    fm_in_local[2*local_i+li][2*local_j+lj] = fm_elem;
+                }
+            }
+            if(local_i<3 && local_j<3){ //TODO: make independent from TILE_SIZE
+                int k = local_i;
+                int l = local_j;
+                kern_in_local[k][l] = conv_kernel[k*xsize + l*ysize + inf*zsize + outf];
+            }
+            barrier(CLK_LOCAL_MEM_FENCE);
+            int i = local_i; int j = local_j;
+            for(int k=0; k<3; ++k){
+                for(int l=0; l<3; ++l){
+                    uchar ck_elem = kern_in_local[k][l];
+                    if(~(ck_elem>>1)&0b1){ // weight is zero so no computation is required
+                        short fm_elem = fm_in_local[i+k][j+l];                                              
+                        if(!ck_elem) fm_elem = -fm_elem;
+                        acc += fm_elem;
+                    }
+                }
+            }
+            barrier(CLK_LOCAL_MEM_FENCE);
+        }
+        fm_out[outf*fsize_out + global_i*fdim_out + global_j] = acc;
+    }
+}
 
 
 /*
