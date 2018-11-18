@@ -25,20 +25,22 @@ __kernel void pe_ff(const int first,
     const int fsize_out = fdim_out*fdim_out; // TODO: avoid multiplication in kernel
     const int max_conv_size = ksize*ksize*conv_size_in*conv_size_out;
     const bool is_strided = (strides==2);
-    __local uchar all_weights[(MAX_TOUT*MAX_TIN*MAX_KSIZE*MAX_KSIZE)/2];
+    __local uchar all_weights[(MAX_TOUT*MAX_TIN*MAX_KSIZE*MAX_KSIZE)/4];
     __local short l_out_fmap[TOUT][TR][TC];
     __local uchar l_weights[MAX_KSIZE][MAX_KSIZE][TOUT][TIN];
     __local short l_fmap[TIN][TR+MAX_KSIZE-1][TC+MAX_KSIZE-1];
 
-    const uint tot_wsize = conv_size_in*conv_size_out*ksize*ksize;
+    const int tot_wsize = conv_size_in*conv_size_out*ksize*ksize;
     uchar two_w = 0;
     for(int mw=0; mw<tot_wsize; ++mw){
-        two_w |= conv_kernel[mw];
-        if((mw % 2) == 1){
-            all_weights[(mw>>1)] = two_w;
+        uchar act = conv_kernel[mw];
+        int mod_mw = (mw % 4);
+        act = act << ((mod_mw)*2);
+        if(mod_mw == 3){
+            all_weights[(mw/4)] = two_w | act;
             two_w = 0;
         } else {
-            two_w = two_w << 4;
+            two_w |= act;
         }
     }
 
@@ -62,6 +64,7 @@ __kernel void pe_ff(const int first,
                     // Load weights
                     const int _tii_limit = min(TIN,  conv_size_in-inf);
                     const int _too_limit = __too_limit;
+                    #pragma loop_coalesce 4
                     for (int k=0; k<ksize; ++k) {
                         for (int l=0; l<ksize; ++l) {
                             for (int tii=inf, _tii=0; _tii<TIN; ++tii, ++_tii) {
@@ -69,8 +72,8 @@ __kernel void pe_ff(const int first,
                                     uchar welem;
                                     if(_too<_too_limit && _tii<_tii_limit) {
                                         int index = k*xsize + l*ysize + tii*zsize + too;
-                                        int get_at = index >> 1;
-                                        int shift_to = index & 0b1;
+                                        int get_at = index /4;
+                                        int shift_to = (index %4)*2;
                                         uchar got = all_weights[get_at];
                                         got = got >> shift_to;
                                         got = got & 0b11;
@@ -104,6 +107,7 @@ __kernel void pe_ff(const int first,
 
                     // Convolution
                     const int _tii_limit_copy = _tii_limit; //necessary???
+                    #pragma loop_coalesce 2
                     for (int k=0; k<ksize; ++k) {
                         for (int l=0; l<ksize; ++l) {
                             for (int _too=0; _too<TOUT; ++_too) {
