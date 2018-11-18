@@ -30,18 +30,10 @@ __kernel void pe_ff(const int first,
     __local uchar l_weights[MAX_KSIZE][MAX_KSIZE][TOUT][TIN];
     __local short l_fmap[TIN][TR+MAX_KSIZE-1][TC+MAX_KSIZE-1];
 
-    const int tot_wsize = conv_size_in*conv_size_out*ksize*ksize;
+    const int tot_wsize = (conv_size_in*conv_size_out*ksize*ksize)/4;
     uchar two_w = 0;
-    for(int mw=0; mw<tot_wsize; ++mw){
-        uchar act = conv_kernel[mw];
-        int mod_mw = (mw % 4);
-        act = act << ((mod_mw)*2);
-        if(mod_mw == 3){
-            all_weights[(mw/4)] = two_w | act;
-            two_w = 0;
-        } else {
-            two_w |= act;
-        }
+    for(int mw=0; mw<tot_wsize; ++mw){ // Move all weights to local memory
+        all_weights[mw] = conv_kernel[mw];
     }
 
     for (int row=(is_strided)?0:-offset; row<fdim_in-offset; row += TR) {

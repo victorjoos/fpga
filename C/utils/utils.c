@@ -80,11 +80,18 @@ conv_t * read_conv(char* filename){
 
     float * _values = (float*)malloc(sizeof(float)*kernel_size);
     fread(_values, sizeof(float), kernel_size, fp);
+    cl_uchar comp_nv = 0;
     for(int i=0; i<kernel_size; ++i){
         cl_uchar nv = 0b00;
         if(_values[i]==0.f) nv = 0b10;
         else if(_values[i]>0.f) nv = 0b01;
-        values[i] = nv;
+        int mod_i = (i % 4);
+        nv = nv << ((mod_i)*2);
+        comp_nv |= nv;
+        if(mod_i == 3){
+            values[i/4] = comp_nv;
+            comp_nv = 0;
+        } 
     }
     conv->kernel = values;
     fclose(fp);
