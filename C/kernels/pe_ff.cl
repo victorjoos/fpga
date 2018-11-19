@@ -1,5 +1,5 @@
 // #include "config.h"
-
+#pragma OPENCL EXTENSION cl_intel_channels : enable
 #define TR 4 // use TR == TC ?
 #define TC 4
 #define TOUT 2
