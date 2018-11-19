@@ -9,6 +9,7 @@
 #define MAX_TIN 128
 
 channel uchar weights_channel;
+channel short fmap_channel;
 
 __kernel void load_weights(const int first,
                 const int conv_size_in, const int conv_size_out,
@@ -38,11 +39,11 @@ __kernel void load_weights(const int first,
                     const int _too_limit = __too_limit;
                     for (int k=0; k<ksize; ++k) {
                         for (int l=0; l<ksize; ++l) {
-                            for (int tii=inf, _tii=0; _tii<TIN; ++tii, ++_tii) {
-                                for (int too=outf, _too=0; _too<TOUT; ++too, ++_too) {
+                            for (int too=outf, _too=0; _too<TOUT; ++too, ++_too) {
+                                for (int tii=inf, _tii=0; _tii<TIN; ++tii, ++_tii) {
                                     uchar weight;
-                                    if (row==0 && col==0) {
-                                        if(_too<_too_limit && _tii<_tii_limit) weight = conv_kernel[k*xsize + l*ysize + tii*zsize + too];
+                                    if (row<=0 && col<=0) {
+                                        if(_too<_too_limit && _tii<_tii_limit) weight = conv_kernel[k*xsize + l*ysize + too*zsize + tii];
                                         else weight = 0b10;
                                         l_weights[k][l][too][tii] = weight;
                                     } else {
@@ -58,6 +59,14 @@ __kernel void load_weights(const int first,
         }
     }
 }
+/*
+__kernel void load_fmaps(const int first,
+                const int conv_size_in, const int conv_size_out,
+                const int ksize, const int strides, 
+                const int fdim_in, const int fdim_out,
+                __global const short* restrict fm_in){
+                }*/
+
 
 __kernel void pe_ff(const int first,
                 const int conv_size_in, const int conv_size_out,
