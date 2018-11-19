@@ -127,7 +127,7 @@ __kernel void pe_ff(const int first,
         }
     }
 }
-#define TILE_SIZE 4
+#define TILE_SIZE 8
 
 __kernel void pe_tile_ff(const int first,
                 const int conv_size_in, const int conv_size_out,
@@ -156,12 +156,13 @@ __kernel void pe_tile_ff(const int first,
     short acc;
 
     const int n_tiles = conv_size_out/TILE_SIZE;
+    const int is_strided = (strides==2);
     for(int outf=0; outf<conv_size_out; ++outf){
         acc = 0;
         for(int inf=0; inf<conv_size_in; ++inf){
             // Load into shared memory
-            int ii = TILE_SIZE*get_group_id(0) + 2*local_i - 1;
-            int jj = TILE_SIZE*get_group_id(1) + 2*local_j - 1;
+            int ii = TILE_SIZE*get_group_id(0) + 2*local_i - offset;
+            int jj = TILE_SIZE*get_group_id(1) + 2*local_j - offset;
             for(int li=0; li<2; ++li){
                 for(int lj=0; lj<2; ++lj){
                     if(2*local_i+li>=TILE_SIZE+2) continue;
@@ -173,15 +174,15 @@ __kernel void pe_tile_ff(const int first,
                     fm_in_local[2*local_i+li][2*local_j+lj] = fm_elem;
                 }
             }
-            if(local_i<3 && local_j<3){ //TODO: make independent from TILE_SIZE
+            if(local_i<ksize && local_j<ksize){ //TODO: make independent from TILE_SIZE
                 int k = local_i;
                 int l = local_j;
                 kern_in_local[k][l] = conv_kernel[k*xsize + l*ysize + inf*zsize + outf];
             }
             barrier(CLK_LOCAL_MEM_FENCE);
             int i = local_i; int j = local_j;
-            for(int k=0; k<3; ++k){
-                for(int l=0; l<3; ++l){
+            for(int k=0; k<ksize; ++k){
+                for(int l=0; l<ksize; ++l){
                     uchar ck_elem = kern_in_local[k][l];
                     if(~(ck_elem>>1)&0b1){ // weight is zero so no computation is required
                         short fm_elem = fm_in_local[i+k][j+l];                                              
@@ -192,7 +193,8 @@ __kernel void pe_tile_ff(const int first,
             }
             barrier(CLK_LOCAL_MEM_FENCE);
         }
-        fm_out[outf*fsize_out + global_i*fdim_out + global_j] = acc;
+        if(!is_strided || (ksize==3 && global_i%2==1 && global_j%2==1) || (ksize==1 && global_i%2==0 && global_j%2==0))
+            fm_out[outf*fsize_out + global_i/strides*fdim_out + global_j/strides] = acc;
     }
 }
 
