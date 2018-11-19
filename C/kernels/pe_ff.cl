@@ -9,7 +9,7 @@
 #define MAX_TIN 128
 
 channel uchar weights_channel;
-channel short fmap_channel;
+channel short fmaps_channel;
 
 __kernel void load_weights(const int first,
                 const int conv_size_in, const int conv_size_out,
@@ -28,21 +28,30 @@ __kernel void load_weights(const int first,
     const bool is_strided = (strides==2);
     
     __local uchar l_weights[MAX_KSIZE][MAX_KSIZE][MAX_TOUT][MAX_TIN];
+    int iter = 0;
+    #pragma ivdep array(l_weights)
     for (int row=(is_strided)?0:-offset; row<fdim_in-offset; row += TR) {
+        #pragma ivdep array(l_weights)
         for (int col=(is_strided)?0:-offset; col<fdim_in-offset; col += TC) {
+            #pragma ivdep array(l_weights)
             for (int outf=0; outf<conv_size_out; outf += TOUT) {
                 const int __too_limit = min(TOUT, conv_size_out-outf);
+                #pragma ivdep array(l_weights)
                 for (int inf=0; inf<conv_size_in; inf += TIN) {
                     // load memory here ...
                     // Load weights
                     const int _tii_limit = min(TIN,  conv_size_in-inf);
                     const int _too_limit = __too_limit;
+                    #pragma ivdep array(l_weights)
                     for (int k=0; k<ksize; ++k) {
+                        #pragma ivdep array(l_weights)
                         for (int l=0; l<ksize; ++l) {
+                            #pragma ivdep array(l_weights)
                             for (int too=outf, _too=0; _too<TOUT; ++too, ++_too) {
+                                #pragma ivdep array(l_weights)
                                 for (int tii=inf, _tii=0; _tii<TIN; ++tii, ++_tii) {
                                     uchar weight;
-                                    if (row<=0 && col<=0) {
+                                    if (iter==0) {
                                         if(_too<_too_limit && _tii<_tii_limit) weight = conv_kernel[k*xsize + l*ysize + too*zsize + tii];
                                         else weight = 0b10;
                                         l_weights[k][l][too][tii] = weight;
@@ -56,6 +65,8 @@ __kernel void load_weights(const int first,
                     }
                 }
             }
+            if (iter==0) mem_fence(CLK_LOCAL_MEM_FENCE);
+            iter = 1;
         }
     }
 }
