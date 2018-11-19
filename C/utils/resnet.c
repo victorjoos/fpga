@@ -57,7 +57,7 @@ resnet_t* build_resnet(int nblocks, char* dir){
 double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
     cl_int ret;
     cl_kernel conv_kernels[2];
-    load_kernel("pe_ff", &conv_kernels[0]);
+    // load_kernel("pe_ff", &conv_kernels[0]);
     load_kernel("pe_tile_ff", &conv_kernels[1]);
 
     int ok = 0;

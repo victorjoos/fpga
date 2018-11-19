@@ -5,7 +5,7 @@
 #define TOUT 2
 #define TIN  2
 #define MAX_KSIZE 3
-
+/*
 __kernel void pe_ff(const int first,
                 const int conv_size_in, const int conv_size_out,
                 const int ksize, const int strides, 
@@ -126,7 +126,7 @@ __kernel void pe_ff(const int first,
             }
         }
     }
-}
+}*/
 #define TILE_SIZE 8
 
 __kernel void pe_tile_ff(const int first,
