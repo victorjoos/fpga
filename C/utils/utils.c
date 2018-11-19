@@ -134,7 +134,7 @@ bn_t * read_bn(char* filename){
     bn->beta = values;
     for(int i=0; i<bn->size; ++i) {
         // TODO: add alert in case beta is too big
-        values[i] = (cl_ushort) roundf(_values[i]*256.f);
+        values[i] = (cl_short) roundf(_values[i]*256.f);
     }
     bn->gamma = (cl_uchar*) (bn->beta + bn->size);
     bn->gamma_sign = bn->gamma + bn->size;
