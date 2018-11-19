@@ -59,13 +59,55 @@ __kernel void load_weights(const int first,
         }
     }
 }
-/*
+
 __kernel void load_fmaps(const int first,
                 const int conv_size_in, const int conv_size_out,
                 const int ksize, const int strides, 
                 const int fdim_in, const int fdim_out,
-                __global const short* restrict fm_in){
-                }*/
+                __global const short* restrict fm_in) {
+    const int zsize = conv_size_out;
+    const int ysize = zsize*conv_size_in;
+    const int xsize = ysize*ksize; 
+    const int offset = ksize/2;
+
+    
+    const int fsize_in = fdim_in*fdim_in; // TODO: avoid multiplication in kernel
+    const int fsize_out = fdim_out*fdim_out; // TODO: avoid multiplication in kernel
+    const int max_conv_size = ksize*ksize*conv_size_in*conv_size_out;
+    const bool is_strided = (strides==2);
+    
+    // __local uchar l_fmap[TIN][TR+MAX_KSIZE-1][TC+MAX_KSIZE-1];
+    for (int row=(is_strided)?0:-offset; row<fdim_in-offset; row += TR) {
+        for (int col=(is_strided)?0:-offset; col<fdim_in-offset; col += TC) {
+            for (int outf=0; outf<conv_size_out; outf += TOUT) {
+                for (int inf=0; inf<conv_size_in; inf += TIN) {
+                    // load memory here ...
+                    // Load weights
+                    const int _tii_limit = min(TIN,  conv_size_in-inf);
+                    const int _too_limit = min(TOUT, conv_size_out-outf);
+                    const int _trr_limit = min(TR+ksize-1, fdim_in+offset-row);
+                    const int _tcc_limit = min(TC+ksize-1, fdim_in+offset-col);
+                    for (int tii=inf, _tii=0; _tii<TIN; ++tii, ++_tii) {
+                        if(_tii<_tii_limit){
+                            for (int trr=row, _trr=0; _trr<TR+MAX_KSIZE-1; ++trr, ++_trr) {
+                                if(_trr<_trr_limit){
+                                    for (int tcc=col, _tcc=0; _tcc<TC+MAX_KSIZE-1; ++tcc, ++_tcc) {
+                                        if(_tcc<_tcc_limit){
+                                            short fm_elem;
+                                            if((trr<0)||(tcc<0)||(trr>=fdim_in)||(tcc>=fdim_in)) fm_elem = 0;
+                                            else fm_elem = fm_in[tii*fsize_in + (trr)*fdim_in + (tcc)];
+                                            write_channel_intel(fmaps_channel, fm_elem);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 
 __kernel void pe_ff(const int first,
@@ -126,12 +168,13 @@ __kernel void pe_ff(const int first,
                             for (int trr=row, _trr=0; _trr<TR+MAX_KSIZE-1; ++trr, ++_trr) {
                                 if(_trr<_trr_limit){
                                     for (int tcc=col, _tcc=0; _tcc<TC+MAX_KSIZE-1; ++tcc, ++_tcc) {
-                                        if(_tcc<_tcc_limit){
+                                        /*if(_tcc<_tcc_limit){
                                             short fm_elem;
                                             if((trr<0)||(tcc<0)||(trr>=fdim_in)||(tcc>=fdim_in)) fm_elem = 0;
                                             else fm_elem = fm_in[tii*fsize_in + (trr)*fdim_in + (tcc)];
                                             l_fmap[_tii][_trr][_tcc] = fm_elem;
-                                        }
+                                        }*/
+                                        l_fmap[_tii][_trr][_tcc] = read_channel_intel(fmaps_channel);
                                     }
                                 }
                             }
