@@ -6,7 +6,7 @@ typedef struct opencl_space{
     int taken[NMB_FM];
     cl_short * fm_buffers[NMB_FM];
     cl_context context; 
-    cl_command_queue queue;
+    cl_command_queue queue[3];
     cl_program program;
     cl_mem fm_fpga_buffers[NMB_FM];
 }cl_space_t;

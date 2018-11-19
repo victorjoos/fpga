@@ -8,14 +8,15 @@
 #define MAX_TOUT 128
 #define MAX_TIN 128
 
-channel uchar weights_channel;
-channel short fmaps_channel;
+channel uchar weights_channel __attribute__((depth(99999999999999)));
+channel short fmaps_channel __attribute__((depth(99999999999999)));
 
 __kernel void load_weights(const int first,
                 const int conv_size_in, const int conv_size_out,
                 const int ksize, const int strides, 
                 const int fdim_in, const int fdim_out,
                 __global const uchar* restrict conv_kernel) {
+    printf("hello from load_weights\n");
 	const int zsize = conv_size_out;
     const int ysize = zsize*conv_size_in;
     const int xsize = ysize*ksize; 
@@ -29,30 +30,30 @@ __kernel void load_weights(const int first,
     
     __local uchar l_weights[MAX_KSIZE][MAX_KSIZE][MAX_TOUT][MAX_TIN];
     int iter = 0;
-    #pragma ivdep array(l_weights)
+    // #pragma ivdep array(l_weights)
     for (int row=(is_strided)?0:-offset; row<fdim_in-offset; row += TR) {
-        #pragma ivdep array(l_weights)
+        // #pragma ivdep array(l_weights)
         for (int col=(is_strided)?0:-offset; col<fdim_in-offset; col += TC) {
-            #pragma ivdep array(l_weights)
+            // #pragma ivdep array(l_weights)
             for (int outf=0; outf<conv_size_out; outf += TOUT) {
                 const int __too_limit = min(TOUT, conv_size_out-outf);
-                #pragma ivdep array(l_weights)
+                // #pragma ivdep array(l_weights)
                 for (int inf=0; inf<conv_size_in; inf += TIN) {
                     // load memory here ...
                     // Load weights
                     const int _tii_limit = min(TIN,  conv_size_in-inf);
                     const int _too_limit = __too_limit;
-                    #pragma ivdep array(l_weights)
+                    // #pragma ivdep array(l_weights)
                     for (int k=0; k<ksize; ++k) {
-                        #pragma ivdep array(l_weights)
+                        // #pragma ivdep array(l_weights)
                         for (int l=0; l<ksize; ++l) {
-                            #pragma ivdep array(l_weights)
-                            for (int too=outf, _too=0; _too<TOUT; ++too, ++_too) {
-                                #pragma ivdep array(l_weights)
-                                for (int tii=inf, _tii=0; _tii<TIN; ++tii, ++_tii) {
+                            // #pragma ivdep array(l_weights)
+                            for (int tii=inf, _tii=0; _tii<TIN; ++tii, ++_tii) {
+                                // #pragma ivdep array(l_weights)
+                                for (int too=outf, _too=0; _too<TOUT; ++too, ++_too) {
                                     uchar weight;
                                     if (iter==0) {
-                                        if(_too<_too_limit && _tii<_tii_limit) weight = conv_kernel[k*xsize + l*ysize + too*zsize + tii];
+                                        if(_too<_too_limit && _tii<_tii_limit) weight = conv_kernel[k*xsize + l*ysize + tii*zsize + too];
                                         else weight = 0b10;
                                         l_weights[k][l][too][tii] = weight;
                                     } else {
@@ -65,7 +66,7 @@ __kernel void load_weights(const int first,
                     }
                 }
             }
-            if (iter==0) mem_fence(CLK_LOCAL_MEM_FENCE);
+            // if (iter==0) mem_fence(CLK_LOCAL_MEM_FENCE);
             iter = 1;
         }
     }
@@ -76,6 +77,7 @@ __kernel void load_fmaps(const int first,
                 const int ksize, const int strides, 
                 const int fdim_in, const int fdim_out,
                 __global const short* restrict fm_in) {
+    printf("hello from load_fmaps\n");
     const int zsize = conv_size_out;
     const int ysize = zsize*conv_size_in;
     const int xsize = ysize*ksize; 
@@ -128,6 +130,7 @@ __kernel void pe_ff(const int first,
                 __global const uchar* restrict conv_kernel,
                 __global const short* restrict fm_in, __global short* restrict fm_out){
     // printf("[KERNEL] ksize: %d, strides: %d, conv_size_in: %d, conv_size_out: %d, fdim_in: %d, fdim_out: %d\n", ksize, strides, conv_size_in, conv_size_out, fdim_in, fdim_out);
+    printf("hello from pe_ff\n");
     const int zsize = conv_size_out;
     const int ysize = zsize*conv_size_in;
     const int xsize = ysize*ksize; 

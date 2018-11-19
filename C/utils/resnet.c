@@ -56,8 +56,10 @@ resnet_t* build_resnet(int nblocks, char* dir){
 
 double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
     cl_int ret;
-    cl_kernel conv_kernels[1];
+    cl_kernel conv_kernels[3];
     load_kernel("pe_ff", &conv_kernels[0]);
+    load_kernel("load_weights", &conv_kernels[1]);
+    load_kernel("load_fmaps", &conv_kernels[2]);
 
     int ok = 0;
     const int n_stacks=3;
@@ -69,6 +71,8 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
         fm_t* fm_prev = fm;
         activation_t act_type = TERNARY;
         fm = convolve(resnet->convs[0], fm, 1, CL_TRUE, conv_kernels); free_fm(fm_prev);
+        print_fm(fm, 0, CL_TRUE);
+        print_fm_sum(fm, CL_TRUE);
         fm = normalize(resnet->bns[0], fm, 1);
         fm = activate(fm, act_type);
         fm_t* fm_shortcut = fm;

@@ -15,31 +15,31 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, int first, cl_kernel* ker
     fm_t* fm_out = alloc_fm(conv->size_out, fm_in->fdim/strides);
 
     // set kernel arguments
-    cl_kernel _kernel = (strides==1 && conv->xsize==3)? kernels[0]: kernels[0];
-
-    cl_int ret; int _karg = 0;
-    ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(first));      checkError(ret, "Failed to set args");
-    ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(conv->size_in));      checkError(ret, "Failed to set args");
-    ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(conv->size_out));     checkError(ret, "Failed to set args");
-    ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(conv->xsize));        checkError(ret, "Failed to set args");
-    ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(strides));            checkError(ret, "Failed to set args");
-    ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(fm_in->fdim));        checkError(ret, "Failed to set args");
-    ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(fm_out->fdim));       checkError(ret, "Failed to set args");
-    ret = clSetKernelArg(_kernel, _karg++, sizeof(cl_mem), (void *)&(conv->fpga_kernel));  checkError(ret, "Failed to set args");
-    ret = clSetKernelArg(_kernel, _karg++, sizeof(cl_mem), (void *)&(fm_in->fpga_values)); checkError(ret, "Failed to set args");
-    ret = clSetKernelArg(_kernel, _karg++, sizeof(cl_mem), (void *)&(fm_out->fpga_values));checkError(ret, "Failed to set args");
-
+    // cl_kernel _kernel = (strides==1 && conv->xsize==3)? kernels[0]: kernels[0];
+    cl_int ret;
+    cl_event event[3];
+    for (int i=2; i>=0; i--) {
+        cl_kernel _kernel = kernels[i];
+        int _karg = 0;
+        ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(first));      checkError(ret, "Failed to set args");
+        ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(conv->size_in));      checkError(ret, "Failed to set args");
+        ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(conv->size_out));     checkError(ret, "Failed to set args");
+        ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(conv->xsize));        checkError(ret, "Failed to set args");
+        ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(strides));            checkError(ret, "Failed to set args");
+        ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(fm_in->fdim));        checkError(ret, "Failed to set args");
+        ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(fm_out->fdim));       checkError(ret, "Failed to set args");
+        if (i==0||i==1) ret = clSetKernelArg(_kernel, _karg++, sizeof(cl_mem), (void *)&(conv->fpga_kernel));  checkError(ret, "Failed to set args");
+        if (i==0||i==2) ret = clSetKernelArg(_kernel, _karg++, sizeof(cl_mem), (void *)&(fm_in->fpga_values)); checkError(ret, "Failed to set args");
+        if (i==0) ret = clSetKernelArg(_kernel, _karg++, sizeof(cl_mem), (void *)&(fm_out->fpga_values));checkError(ret, "Failed to set args");
+        ret = clEnqueueTask(space->queue[i], _kernel, 0, NULL, &event[i]);
+        checkError(ret, "Failed enqueing kernel");
+    }
     // Execute the OpenCL kernel
-    cl_event event;
-    size_t global_size = (size_t) conv->size_out;
-    size_t local_size = (size_t) 8;
-    ret = clEnqueueTask(space->queue, _kernel, 0, NULL, &event);
     // ret = clEnqueueNDRangeKernel(space->queue, _kernel, 1, NULL,
     //         &global_size, &local_size, 0, NULL, &event);
-    checkError(ret, "Failed enqueing kernel");
     // printf("%d, %d\n", ret, CL_SUCCESS);
     // printf("kernel started\n" );
-    ret = clWaitForEvents(1, &event);
+    ret = clWaitForEvents(3, event);
     checkError(ret, "Failed waiting for events");
     // printf("kernel finished\n");
 
