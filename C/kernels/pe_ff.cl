@@ -40,15 +40,15 @@ __kernel void load_weights(const int first,
                         for (int l=0; l<ksize; ++l) {
                             for (int tii=inf, _tii=0; _tii<TIN; ++tii, ++_tii) {
                                 for (int too=outf, _too=0; _too<TOUT; ++too, ++_too) {
+                                    uchar weight;
                                     if (row==0 && col==0) {
-                                        uchar weight;
                                         if(_too<_too_limit && _tii<_tii_limit) weight = conv_kernel[k*xsize + l*ysize + tii*zsize + too];
                                         else weight = 0b10;
                                         l_weights[k][l][too][tii] = weight;
-                                        write_channel_intel(weights_channel, weight);
                                     } else {
-                                        write_channel_intel(weights_channel, l_weights[k][l][too][tii]);
+                                        weight = l_weights[k][l][too][tii];
                                     }
+                                    write_channel_intel(weights_channel, weight);
                                 }
                             }
                         }
