@@ -5,6 +5,59 @@
 #define TOUT 2
 #define TIN  2
 #define MAX_KSIZE 3
+#define MAX_TOUT 128
+#define MAX_TIN 128
+
+channel uchar weights_channel;
+
+__kernel void load_weights(const int first,
+                const int conv_size_in, const int conv_size_out,
+                const int ksize, const int strides, 
+                const int fdim_in, const int fdim_out,
+                __global const uchar* restrict conv_kernel) {
+	const int zsize = conv_size_out;
+    const int ysize = zsize*conv_size_in;
+    const int xsize = ysize*ksize; 
+    const int offset = ksize/2;
+
+    
+    const int fsize_in = fdim_in*fdim_in; // TODO: avoid multiplication in kernel
+    const int fsize_out = fdim_out*fdim_out; // TODO: avoid multiplication in kernel
+    const int max_conv_size = ksize*ksize*conv_size_in*conv_size_out;
+    const bool is_strided = (strides==2);
+    
+    __local uchar l_weights[MAX_KSIZE][MAX_KSIZE][MAX_TOUT][MAX_TIN];
+    for (int row=(is_strided)?0:-offset; row<fdim_in-offset; row += TR) {
+        for (int col=(is_strided)?0:-offset; col<fdim_in-offset; col += TC) {
+            for (int outf=0; outf<conv_size_out; outf += TOUT) {
+                const int __too_limit = min(TOUT, conv_size_out-outf);
+                for (int inf=0; inf<conv_size_in; inf += TIN) {
+                    // load memory here ...
+                    // Load weights
+                    const int _tii_limit = min(TIN,  conv_size_in-inf);
+                    const int _too_limit = __too_limit;
+                    for (int k=0; k<ksize; ++k) {
+                        for (int l=0; l<ksize; ++l) {
+                            for (int tii=inf, _tii=0; _tii<TIN; ++tii, ++_tii) {
+                                for (int too=outf, _too=0; _too<TOUT; ++too, ++_too) {
+                                    if (row==0 && col==0) {
+                                        uchar weight;
+                                        if(_too<_too_limit && _tii<_tii_limit) weight = conv_kernel[k*xsize + l*ysize + tii*zsize + too];
+                                        else weight = 0b10;
+                                        l_weights[k][l][too][tii] = weight;
+                                        write_channel_intel(weights_channel, weight);
+                                    } else {
+                                        write_channel_intel(weights_channel, l_weights[k][l][too][tii]);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 __kernel void pe_ff(const int first,
                 const int conv_size_in, const int conv_size_out,
@@ -50,10 +103,7 @@ __kernel void pe_ff(const int first,
                         for (int l=0; l<ksize; ++l) {
                             for (int tii=inf, _tii=0; _tii<TIN; ++tii, ++_tii) {
                                 for (int too=outf, _too=0; _too<TOUT; ++too, ++_too) {
-                                    uchar fmap;
-                                    if(_too<_too_limit && _tii<_tii_limit) fmap = conv_kernel[k*xsize + l*ysize + tii*zsize + too];
-                                    else fmap = 0;
-                                    l_weights[k][l][_too][_tii] = fmap;
+                                    l_weights[k][l][_too][_tii] = read_channel_intel(weights_channel);
                                 }
                             }
                         }
