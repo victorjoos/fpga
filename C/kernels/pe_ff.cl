@@ -1,15 +1,20 @@
 // #include "config.h"
 #pragma OPENCL EXTENSION cl_intel_channels : enable
-#define TR 4 // use TR == TC ?
-#define TC 4
-#define TOUT 2
-#define TIN  2
+#define TR 8 // use TR == TC ?
+#define TC 8
+#define TOUT 8
+#define TIN  4
 #define MAX_KSIZE 3
 #define MAX_TOUT 128
 #define MAX_TIN 128
 
-channel uchar weights_channel __attribute__((depth(128*128*512*9)));
-channel short fmaps_channel __attribute__((depth(128*128*512*64)));
+#ifndef FPGA_EMU
+    channel uchar weights_channel;// __attribute__((depth(99999999999999)));
+    channel short fmaps_channel;// __attribute__((depth(99999999999999)));
+#else
+    channel uchar weights_channel __attribute__((depth(99999999999999)));
+    channel short fmaps_channel __attribute__((depth(99999999999999)));
+#endif
 
 __kernel void load_weights(const int first,
                 const int conv_size_in, const int conv_size_out,
@@ -101,16 +106,17 @@ __kernel void load_fmaps(const int first,
                     const int _trr_limit = min(TR+ksize-1, fdim_in+offset-row);
                     const int _tcc_limit = min(TC+ksize-1, fdim_in+offset-col);
                     for (int tii=inf, _tii=0; _tii<TIN; ++tii, ++_tii) {
-                        bool tii_ok = _tii<_tii_limit;
-                        for (int trr=row, _trr=0; _trr<TR+MAX_KSIZE-1; ++trr, ++_trr) {
-                            bool trr_ok = (_trr<_trr_limit);
-                            for (int tcc=col, _tcc=0; _tcc<TC+MAX_KSIZE-1; ++tcc, ++_tcc) {
-                                bool tcc_ok = _tcc<_tcc_limit;
-                                if(tii_ok && trr_ok && tcc_ok){
-                                    short fm_elem;
-                                    if((trr<0)||(tcc<0)||(trr>=fdim_in)||(tcc>=fdim_in)) fm_elem = 0;
-                                    else fm_elem = fm_in[tii*fsize_in + (trr)*fdim_in + (tcc)];
-                                    write_channel_intel(fmaps_channel, fm_elem);
+                        if(_tii<_tii_limit){
+                            for (int trr=row, _trr=0; _trr<TR+MAX_KSIZE-1; ++trr, ++_trr) {
+                                if(_trr<_trr_limit){
+                                    for (int tcc=col, _tcc=0; _tcc<TC+MAX_KSIZE-1; ++tcc, ++_tcc) {
+                                        if(_tcc<_tcc_limit){
+                                            short fm_elem;
+                                            if((trr<0)||(tcc<0)||(trr>=fdim_in)||(tcc>=fdim_in)) fm_elem = 0;
+                                            else fm_elem = fm_in[tii*fsize_in + (trr)*fdim_in + (tcc)];
+                                            write_channel_intel(fmaps_channel, fm_elem);
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -161,7 +167,8 @@ __kernel void pe_ff(const int first,
                 for (int inf=0; inf<conv_size_in; inf += TIN) {
                     // load memory here ...
                     // Load weights
-                    // const int _too_limit = __too_limit;
+                    const int _tii_limit = min(TIN,  conv_size_in-inf);
+                    const int _too_limit = __too_limit;
                     for (int k=0; k<ksize; ++k) {
                         for (int l=0; l<ksize; ++l) {
                             for (int tii=inf, _tii=0; _tii<TIN; ++tii, ++_tii) {
@@ -173,17 +180,16 @@ __kernel void pe_ff(const int first,
                     }
 
                     // Load fmaps
-                    const int _tii_limit = min(TIN,  conv_size_in-inf);
                     const int _trr_limit = min(TR+ksize-1, fdim_in+offset-row);
                     const int _tcc_limit = min(TC+ksize-1, fdim_in+offset-col);
                     for (int tii=inf, _tii=0; _tii<TIN; ++tii, ++_tii) {
-                        bool tii_ok = _tii<_tii_limit;
-                        for (int trr=row, _trr=0; _trr<TR+MAX_KSIZE-1; ++trr, ++_trr) {
-                            bool trr_ok = (_trr<_trr_limit);
-                            for (int tcc=col, _tcc=0; _tcc<TC+MAX_KSIZE-1; ++tcc, ++_tcc) {
-                                bool tcc_ok = _tcc<_tcc_limit;
-                                if(tii_ok && trr_ok && tcc_ok){
-                                    l_fmap[_tii][_trr][_tcc] = read_channel_intel(fmaps_channel);
+                        if(_tii<_tii_limit){
+                            for (int trr=row, _trr=0; _trr<TR+MAX_KSIZE-1; ++trr, ++_trr) {
+                                if(_trr<_trr_limit){
+                                    for (int tcc=col, _tcc=0; _tcc<TC+MAX_KSIZE-1; ++tcc, ++_tcc) {
+                                        if(_tcc<_tcc_limit)
+                                            l_fmap[_tii][_trr][_tcc] = read_channel_intel(fmaps_channel);
+                                    }
                                 }
                             }
                         }
@@ -195,14 +201,15 @@ __kernel void pe_ff(const int first,
                         for (int l=0; l<ksize; ++l) {
                             for (int _too=0; _too<TOUT; ++_too) {
                                 for (int _tii=0; _tii<TIN; ++_tii) {
-                                    const bool tii_ok = (_tii<_tii_limit_copy);
-                                    uchar ck_elem = l_weights[k][l][_too][_tii];
-                                    for (int _trr=0; _trr<TR; ++_trr) {
-                                        for (int _tcc=0; _tcc<TC; ++_tcc) {
-                                            if(tii_ok && ~(ck_elem>>1)&0b1){ // weight is zero so no computation is required
-                                                short fm_elem = l_fmap[_tii][_trr+k][_tcc+l];
-                                                if(!ck_elem) fm_elem = -fm_elem;
-                                                l_out_fmap[_too][_trr][_tcc] += fm_elem;
+                                    if(_tii<_tii_limit_copy){
+                                        uchar ck_elem = l_weights[k][l][_too][_tii];
+                                        if(~(ck_elem>>1)&0b1){ // weight is zero so no computation is required
+                                            for (int _trr=0; _trr<TR; ++_trr) {
+                                                for (int _tcc=0; _tcc<TC; ++_tcc) {
+                                                    short fm_elem = l_fmap[_tii][_trr+k][_tcc+l];
+                                                    if(!ck_elem) fm_elem = -fm_elem;
+                                                    l_out_fmap[_too][_trr][_tcc] += fm_elem;
+                                                }
                                             }
                                         }
                                     }
@@ -217,10 +224,9 @@ __kernel void pe_ff(const int first,
                 const int _offset = (is_strided)?0:offset;
                 const int _too_limit_copy = __too_limit;
                 for (int too=outf, _too=0; _too<TOUT; ++too, ++_too) {
-                    const bool too_ok = _too<_too_limit_copy;
-                    for (int trr=row/strides, _trr=0; trr<min(row+TR, fdim_out-offset) && _trr<TR; ++trr, _trr+=strides) {
-                        for (int tcc=col/strides, _tcc=0; tcc<min(col+TC, fdim_out-offset) && _tcc<TC; ++tcc, _tcc+=strides) {
-                            if(too_ok){
+                    if(_too<_too_limit_copy){
+                        for (int trr=row/strides, _trr=0; trr<min(row+TR, fdim_out-offset) && _trr<TR; ++trr, _trr+=strides) {
+                            for (int tcc=col/strides, _tcc=0; tcc<min(col+TC, fdim_out-offset) && _tcc<TC; ++tcc, _tcc+=strides) {
                                 short fm_elem = l_out_fmap[_too][_trr][_tcc];
                                 fm_out[too*fsize_out + (trr+_offset)*fdim_out + (tcc+_offset)] = fm_elem; 
                             }
@@ -231,4 +237,3 @@ __kernel void pe_ff(const int first,
         }
     }
 }
-
