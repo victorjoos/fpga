@@ -130,7 +130,7 @@ bn_t * read_bn(char* filename){
     // read remaining values
     float* _values = (float*) malloc(sizeof(float) * 2*bn->size);
     fread(_values, sizeof(float), 2*bn->size, fp);
-    cl_ushort* values = (cl_ushort*) malloc((sizeof(cl_ushort) + sizeof(cl_char)*2)*bn->size);
+    cl_ushort* values = (cl_short*) malloc((sizeof(cl_ushort) + sizeof(cl_char)*2)*bn->size);
     bn->beta = values;
     for(int i=0; i<bn->size; ++i) {
         // TODO: add alert in case beta is too big
