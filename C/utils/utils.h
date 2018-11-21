@@ -28,10 +28,14 @@ typedef struct dense {
     int size_out;
 } dense_t;
 
+typedef struct bn_vals{
+    cl_char gamma;
+    cl_char gsign;
+    cl_short beta;
+} bn_vals_t;
 typedef struct bn {
-    cl_ushort * beta;
-    cl_char * gamma;
-    cl_char * gamma_sign;
+    bn_vals_t * values;
+    cl_mem fpga_values;
     int size;
 } bn_t;
 typedef struct feature_map{

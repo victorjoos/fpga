@@ -10,15 +10,15 @@
 
 
 
-fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, int first, cl_kernel* kernels){
+fm_t* convolve(conv_t* conv, bn_t* bn, fm_t* fm_in, int strides, int first, cl_kernel* kernels){
     assert(conv->size_in == fm_in->nchannels);
     fm_t* fm_out = alloc_fm(conv->size_out, fm_in->fdim/strides);
 
     // set kernel arguments
     // cl_kernel _kernel = (strides==1 && conv->xsize==3)? kernels[0]: kernels[0];
     cl_int ret;
-    cl_event event[3];
-    for (int i=2; i>=0; i--) {
+    cl_event event[N_KERNELS];
+    for (int i=N_KERNELS-1; i>=0; i--) {
         cl_kernel _kernel = kernels[i];
         int _karg = 0;
         ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(first));      checkError(ret, "Failed to set args");
@@ -28,8 +28,9 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, int first, cl_kernel* ker
         ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(strides));            checkError(ret, "Failed to set args");
         ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(fm_in->fdim));        checkError(ret, "Failed to set args");
         ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(fm_out->fdim));       checkError(ret, "Failed to set args");
-        if (i==0||i==1) ret = clSetKernelArg(_kernel, _karg++, sizeof(cl_mem), (void *)&(conv->fpga_kernel));  checkError(ret, "Failed to set args");
-        if (i==0||i==2) ret = clSetKernelArg(_kernel, _karg++, sizeof(cl_mem), (void *)&(fm_in->fpga_values)); checkError(ret, "Failed to set args");
+        if (i==2) ret = clSetKernelArg(_kernel, _karg++, sizeof(cl_mem), (void *)&(conv->fpga_kernel));  checkError(ret, "Failed to set args");
+        if (i==3) ret = clSetKernelArg(_kernel, _karg++, sizeof(cl_mem), (void *)&(fm_in->fpga_values)); checkError(ret, "Failed to set args");
+        if (i==4) ret = clSetKernelArg(_kernel, _karg++, sizeof(cl_mem), (void *)&(bn->fpga_values)); checkError(ret, "Failed to set args");
         if (i==0) ret = clSetKernelArg(_kernel, _karg++, sizeof(cl_mem), (void *)&(fm_out->fpga_values));checkError(ret, "Failed to set args");
         ret = clEnqueueTask(space->queue[i], _kernel, 0, NULL, &event[i]);
         checkError(ret, "Failed enqueing kernel");
@@ -39,8 +40,9 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, int first, cl_kernel* ker
     //         &global_size, &local_size, 0, NULL, &event);
     // printf("%d, %d\n", ret, CL_SUCCESS);
     // printf("kernel started\n" );
-    ret = clWaitForEvents(3, event);
+    ret = clWaitForEvents(N_KERNELS, event);
     checkError(ret, "Failed waiting for events");
+    for (int i=N_KERNELS-1; i>=0; i--) clReleaseEvent(event[i]);
     // printf("kernel finished\n");
 
     return fm_out;
@@ -118,9 +120,10 @@ fm_t* normalize(bn_t* bn, fm_t* fm_in, int first){
     assert(bn->size == fm_in->nchannels);
     cl_short* values = fm_in->values;
     for(int n=0; n<fm_in->nchannels; ++n){
-        cl_short beta = bn->beta[n];
-        cl_char gamma = bn->gamma[n];
-        cl_char gsign = bn->gamma_sign[n];
+        bn_vals_t bv = bn->values[n];
+        cl_char gamma = bv.gamma;
+        cl_char gsign = bv.gsign;
+        cl_short beta = bv.beta;
         
         for(int i=0; i<fm_in->fsize; ++i){
             cl_short x = *values;

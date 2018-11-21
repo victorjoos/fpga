@@ -27,9 +27,9 @@ cl_mem alloc_shared_buffer_uchar (size_t size, cl_uchar **host_ptr) {
   assert (*host_ptr != NULL);
   return device_ptr;
 }
-cl_mem alloc_shared_buffer_short (size_t size, cl_short **host_ptr) {
+cl_mem alloc_shared_buffer_bn_vals (size_t size, bn_vals_t **host_ptr) {
   cl_int status;
-  cl_mem device_ptr = clCreateBuffer(space->context, CL_MEM_ALLOC_HOST_PTR, sizeof(cl_short) * size, NULL, &status);
+  cl_mem device_ptr = clCreateBuffer(space->context, CL_MEM_ALLOC_HOST_PTR, sizeof(bn_vals_t) * size, NULL, &status);
   checkError(status, "Failed to create buffer");
   assert (host_ptr != NULL);
   *host_ptr = (cl_short*) clEnqueueMapBuffer(space->queue[0], device_ptr, CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(cl_short) * size, 0, NULL, NULL, &status);
@@ -130,23 +130,22 @@ bn_t * read_bn(char* filename){
     // read remaining values
     float* _values = (float*) malloc(sizeof(float) * 2*bn->size);
     fread(_values, sizeof(float), 2*bn->size, fp);
-    cl_ushort* values = (cl_short*) malloc((sizeof(cl_ushort) + sizeof(cl_char)*2)*bn->size);
-    bn->beta = values;
+    bn_vals_t* values;
+    bn->fpga_values = alloc_shared_buffer_bn_vals(bn->size, &values);
+    bn->values = values;
     for(int i=0; i<bn->size; ++i) {
         // TODO: add alert in case beta is too big
-        values[i] = (cl_ushort) roundf(_values[i]*256.f);
+        values[i].beta = (cl_short) roundf(_values[i]*256.f);
     }
-    bn->gamma = (cl_uchar*) (bn->beta + bn->size);
-    bn->gamma_sign = bn->gamma + bn->size;
     for(int i=0, _i=bn->size; i<bn->size; ++i, ++_i) {
         // TODO: add alert in case gamma exponent is too big
         float l2 = log2f(fabsf(_values[_i]));
         l2 = roundf(l2);
         l2 = fminf(fmaxf(l2, -128.f), +127.f);
         // 8bits for exponent
-        bn->gamma[i] = (cl_char) l2;
+        values[i].gamma = (cl_char) l2;
         // 8bits for sign (TODO: optimise??)
-        bn->gamma_sign[i] = (_values[_i]<0.f)? 1: 0;
+        values[i].gsign = (_values[_i]<0.f)? 1: 0;
     }
     fclose(fp);
     free(_values);
@@ -259,7 +258,7 @@ void free_dense(dense_t* dense){
     free(dense);
 }
 void free_bn(bn_t* bn){
-    free(bn->beta);
+    free(bn->values);
     free(bn);
 }
 void free_fm(fm_t* fm){

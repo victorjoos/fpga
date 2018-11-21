@@ -5,6 +5,7 @@
 #include "cl_utils.h"
 #include "utils.h"
 #include <assert.h>
+#include "../config.h"
 #define MAX_SOURCE_SIZE (0x100000)
 
 int init_cl(char* file_name){
@@ -53,7 +54,7 @@ int init_cl(char* file_name){
     checkError(ret, "Failed create context");
 
     // Create a command queue
-    for (int i=0; i<3; i++) {
+    for (int i=0; i<N_KERNELS; i++) {
 		space->queue[i] = clCreateCommandQueue(space->context, device_id, 0, &ret);
     	checkError(ret, "Failed create command queue");
 	}
@@ -110,7 +111,7 @@ void free_cl(cl_kernel * kernels){
     cl_int ret;
     ret = clFlush(space->queue[0]);
     ret = clFinish(space->queue[0]);
-    for(int i=0; i<1; ++i) clReleaseKernel(kernels[i]);
+    for(int i=0; i<N_KERNELS; ++i) clReleaseKernel(kernels[i]);
     ret = clReleaseProgram(space->program);
     ret = clReleaseCommandQueue(space->queue[0]);
     ret = clReleaseContext(space->context);

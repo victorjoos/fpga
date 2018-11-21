@@ -3,6 +3,7 @@
 
 #define TILE_SIZE 4
 #define KERNEL 1
+#define N_KERNELS 5
 
 
 #endif
