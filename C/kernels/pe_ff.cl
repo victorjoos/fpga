@@ -326,13 +326,15 @@ __kernel void write_fmaps(const int first,
                         fm_elem += beta;
 
                         // Activate
+                        // printf("%d, ", fm_elem);
                         if(fm_elem<0){
-                            if( fm_elem < -128) fm_elem =  0;
+                            if( fm_elem > -128) fm_elem =  0;
                             else         fm_elem = -1;
                         } else {
                             if( fm_elem > 128 ) fm_elem =  1;
                             else         fm_elem =  0;
                         }
+                        // printf("%d \n", fm_elem);
                         fm_out[outf*fsize_out + (trr+_offset)*fdim_out + (tcc+_offset)] = fm_elem; 
                     }
                 }

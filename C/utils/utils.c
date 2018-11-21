@@ -258,7 +258,8 @@ void free_dense(dense_t* dense){
     free(dense);
 }
 void free_bn(bn_t* bn){
-    free(bn->values);
+    clEnqueueUnmapMemObject (space->queue[0], bn->fpga_values, bn->values, 0, NULL, NULL);
+    clReleaseMemObject (bn->fpga_values);
     free(bn);
 }
 void free_fm(fm_t* fm){
