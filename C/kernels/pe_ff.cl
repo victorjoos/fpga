@@ -23,7 +23,7 @@ typedef struct bn_vals{
     channel uchar weights_channel __attribute__((depth(9999999999999)));
     channel short fmaps_channel __attribute__((depth(9999999999999)));
     channel short out_fmaps_channel __attribute__((depth(9999999999999)));
-    channel struct bn_vals bns_channel __attribute__((depth(9999999999999)));
+    channel struct bn_vals bns_channel __attribute__((depth(128*16*16)));
 #endif
 
 __kernel void load_weights(const int first,
@@ -159,18 +159,13 @@ __kernel void load_bns(const int first,
     #pragma loop_coalesce 3
     for (int row=(is_strided)?0:-offset; row<fdim_in-offset; row += TR) {
         for (int col=(is_strided)?0:-offset; col<fdim_in-offset; col += TC) {
-            for (int outf=0; outf<conv_size_out; outf += TOUT) {
-                const int __too_limit = min(TOUT, conv_size_out-outf);
-                for (int inf=0; inf<conv_size_in; inf += TIN) {
-                    const int _offset = (is_strided)?0:offset;
-                    const int _too_limit_copy = __too_limit;
-                    for (int too=outf, _too=0; _too<TOUT; ++too, ++_too) {
-                        if(_too<_too_limit_copy){
-                            bn_vals_t bv = bn_values[too];
-                            write_channel_intel(bns_channel, bv);
-                        }
-                    }
-                }
+            for (int outf=0; outf<conv_size_out; ++outf) {
+                // const int _too_limit_copy = min(TOUT, conv_size_out-outf);
+                // for (int too=outf, _too=0; _too<TOUT; ++too, ++_too) {
+                // if(_too<_too_limit_copy){
+                bn_vals_t bv = bn_values[outf];
+                write_channel_intel(bns_channel, bv);
+                // }
             }
         }
     }
@@ -306,22 +301,39 @@ __kernel void write_fmaps(const int first,
     #pragma loop_coalesce 3
     for (int row=(is_strided)?0:-offset; row<fdim_in-offset; row += TR) {
         for (int col=(is_strided)?0:-offset; col<fdim_in-offset; col += TC) {
-            for (int outf=0; outf<conv_size_out; outf += TOUT) {
-                const int __too_limit = min(TOUT, conv_size_out-outf);
+            for (int outf=0; outf<conv_size_out; outf += 1) {
                 // Store in output fmap
                 const int _offset = (is_strided)?0:offset;
-                const int _too_limit_copy = __too_limit;
-                for (int too=outf, _too=0; _too<TOUT; ++too, ++_too) {
-                    if(_too<_too_limit_copy){
-                        struct bn_vals bv = read_channel_intel(bns_channel);
-                        for (int trr=row/strides, _trr=0; trr<min(row+TR, fdim_out-offset) && _trr<TR; ++trr, _trr+=strides) {
-                            for (int tcc=col/strides, _tcc=0; tcc<min(col+TC, fdim_out-offset) && _tcc<TC; ++tcc, _tcc+=strides) {
-                                short fm_elem = read_channel_intel(out_fmaps_channel);
-                                //TODO: bn
-                                //TODO: activate
-                                fm_out[too*fsize_out + (trr+_offset)*fdim_out + (tcc+_offset)] = fm_elem; 
-                            }
+                struct bn_vals bv = read_channel_intel(bns_channel);
+                char gamma = bv.gamma;
+                char gsign = bv.gsign;
+                short beta = bv.beta;
+                uchar abs_gamma = (gamma<0)?-gamma:gamma;
+                bool is_gamma_neg = (gamma<0);
+                for (int trr=row/strides, _trr=0; trr<min(row+TR, fdim_out-offset) && _trr<TR; ++trr, _trr+=strides) {
+                    for (int tcc=col/strides, _tcc=0; tcc<min(col+TC, fdim_out-offset) && _tcc<TC; ++tcc, _tcc+=strides) {
+                        short fm_elem = read_channel_intel(out_fmaps_channel);
+                        // Apply BN
+                        bool is_fe_neg = fm_elem<0;
+                        ushort ufe = (is_fe_neg)?-fm_elem:fm_elem;
+                        if(!first)  ufe = ufe << 8;
+                        if(is_gamma_neg) ufe = ufe >> abs_gamma;
+                        else             ufe = ufe << abs_gamma;
+                        
+                        fm_elem = ufe;
+                        char fsign =(is_fe_neg)?1: 0;
+                        if(fsign ^ gsign) fm_elem = -fm_elem;
+                        fm_elem += beta;
+
+                        // Activate
+                        if(fm_elem<0){
+                            if( fm_elem < -128) fm_elem =  0;
+                            else         fm_elem = -1;
+                        } else {
+                            if( fm_elem > 128 ) fm_elem =  1;
+                            else         fm_elem =  0;
                         }
+                        fm_out[outf*fsize_out + (trr+_offset)*fdim_out + (tcc+_offset)] = fm_elem; 
                     }
                 }
             }

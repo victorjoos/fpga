@@ -45,7 +45,6 @@ int main( int argc, char * argv[]){
     start_timer(&timer);
     float acc = infer_resnet(resnet, dataset, n);
     printf("%.4f accuracy on %d images\n", acc, n);
-    free_resnet(resnet);
     free(dataset);
     print_stop_timer(&timer);
     // char* image_10 = get_image(1, dataset);

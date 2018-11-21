@@ -118,6 +118,7 @@ fm_t* add(fm_t* fm_in1, fm_t* fm_in2){
 }
 fm_t* normalize(bn_t* bn, fm_t* fm_in, int first){
     assert(bn->size == fm_in->nchannels);
+    return fm_in;
     cl_short* values = fm_in->values;
     for(int n=0; n<fm_in->nchannels; ++n){
         bn_vals_t bv = bn->values[n];
