@@ -1,7 +1,7 @@
 // #include "config.h"
 #pragma OPENCL EXTENSION cl_intel_channels : enable
-#define TR 16 // use TR == TC ?
-#define TC 16
+#define TR 8 // use TR == TC ?
+#define TC 8
 #define TOUT 32
 #define TIN  32
 #define MAX_KSIZE 3
@@ -246,7 +246,7 @@ __kernel void pe_ff(const int first,
                                     if(_tii<_tii_limit_copy){
                                         uchar ck_elem = l_weights[k][l][_too][_tii];
                                         if(~(ck_elem>>1)&0b1){ // weight is zero so no computation is required
-                                            // #pragma unroll
+                                            #pragma unroll 4
                                             for (int _trr=0; _trr<TR; ++_trr) {
                                                 #pragma unroll
                                                 for (int _tcc=0; _tcc<TC; ++_tcc) {
@@ -341,4 +341,26 @@ __kernel void write_fmaps(const int first,
             }
         }
     }
+}
+
+__kernel void add(const int size,
+                    __global short* restrict fm_in1,
+                    __global short* restrict fm_in2,
+                    __global short* restrict fm_out){
+    #pragma unroll 8
+    for(int i=0; i<size; ++i){
+        short fel1 = fm_in1[i];
+        short fel2 = fm_in2[i];
+        short fm_elem = fel1 + fel2;
+        // fm_elem = fm_elem;
+        if(fm_elem<0){
+            if( fm_elem > -1) fm_elem =  0;
+            else         fm_elem = -1;
+        } else {
+            if( fm_elem > 1 ) fm_elem =  1;
+            else         fm_elem =  0;
+        }
+        fm_out[i] = fm_elem;
+    }
+    
 }

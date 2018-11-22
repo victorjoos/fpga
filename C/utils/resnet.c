@@ -63,6 +63,8 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
     load_kernel("load_weights", &conv_kernels[_select_k++]);
     load_kernel("load_fmaps", &conv_kernels[_select_k++]);
     load_kernel("load_bns", &conv_kernels[_select_k++]);
+    cl_kernel add_kernel;
+    load_kernel("add", &add_kernel);
 
     int ok = 0;
     const int n_stacks=3;
@@ -74,7 +76,7 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
         fm_t* fm_prev = fm;
         activation_t act_type = TERNARY;
         fm = convolve(resnet->convs[0], resnet->bns[0], fm, 1, CL_TRUE, conv_kernels); free_fm(fm_prev);
-        fm = normalize(resnet->bns[0], fm, 1);
+        // fm = normalize(resnet->bns[0], fm, 1);
         // fm = activate(fm, act_type);
         // print_fm(fm, 0, CL_TRUE);
         // print_fm_sum(fm, CL_TRUE);
@@ -91,11 +93,13 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
                 // Main block C->BN->Act->C->BN->Act
                 int strides = (st>0 && bl==0)? 2: 1;
                 fm = convolve(resnet->convs[conv_index], resnet->bns[bn_index],fm, strides, CL_FALSE, conv_kernels); ++conv_index;
-                fm = normalize(resnet->bns[bn_index], fm, 0); ++bn_index;
+                // fm = normalize(resnet->bns[bn_index], fm, 0); 
+                ++bn_index;
                 // fm = activate(fm, act_type);
                 fm_prev = fm;
                 fm = convolve(resnet->convs[conv_index], resnet->bns[bn_index], fm, 1, CL_FALSE, conv_kernels); ++conv_index; free_fm(fm_prev);
-                fm = normalize(resnet->bns[bn_index], fm, 0); ++bn_index;
+                // fm = normalize(resnet->bns[bn_index], fm, 0); 
+                ++bn_index;
                 // fm = activate(fm, act_type);
                 
                 // Update indices (not very beautyful but easier than recalculating)
@@ -107,14 +111,18 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
                     fm_shortcut = convolve(resnet->convs[short_conv_index], resnet->bns[bn_index],
                                             fm_shortcut, 2, CL_FALSE, conv_kernels);
                     free_fm(fm_prev);
-                    fm_shortcut = normalize(resnet->bns[bn_index], fm_shortcut, 0); ++bn_index;
+                    // fm_shortcut = normalize(resnet->bns[bn_index], fm_shortcut, 0); 
+                    ++bn_index;
                     // fm_shortcut = activate(fm_shortcut, act_type);
                 }
 
                 // Addition with shortcut
-                fm = add(fm, fm_shortcut); free_fm(fm_shortcut);
-                fm = divide(fm);
-                fm = activate(fm, act_type);
+                fm_prev = fm;
+                fm = add(fm, fm_shortcut,add_kernel); 
+                free_fm(fm_shortcut);
+                free_fm(fm_prev);
+                // fm = divide(fm);
+                // fm = activate(fm, act_type);
                 // Update shortcut value
                 fm_shortcut = fm;
                              
@@ -140,6 +148,6 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
     }
 
     free_resnet(resnet);
-    free_cl(conv_kernels);
+    free_cl(conv_kernels);// TODO:, add_kernel);
     return ((double) ok) / (double)n_imgs;
 }
