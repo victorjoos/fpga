@@ -17,5 +17,5 @@ fm_t* avg_pool(fm_t* fm_in);
 fm_t* normalize(bn_t* bn, fm_t* fm_in, int first); 
 fm_t* activate(fm_t* fm_in, activation_t activ);
 fm_t* divide(fm_t* fm_in);
-fm_t* add(fm_t* fm_in1, fm_t* fm_in2);
+fm_t* add(fm_t* fm_in1, fm_t* fm_in2, cl_kernel kernel);
 #endif

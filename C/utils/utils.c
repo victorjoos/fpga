@@ -22,7 +22,7 @@ cl_mem alloc_shared_buffer_uchar (size_t size, cl_uchar **host_ptr) {
   cl_mem device_ptr = clCreateBuffer(space->context, CL_MEM_ALLOC_HOST_PTR, sizeof(cl_uchar) * size, NULL, &status);
   checkError(status, "Failed to create buffer");
   assert (host_ptr != NULL);
-  *host_ptr = (cl_uchar*) clEnqueueMapBuffer(space->queue, device_ptr, CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(cl_uchar) * size, 0, NULL, NULL, &status);
+  *host_ptr = (cl_uchar*) clEnqueueMapBuffer(space->queue[0], device_ptr, CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(cl_uchar) * size, 0, NULL, NULL, &status);
   checkError(status, "Failed to create shared pointer");
   assert (*host_ptr != NULL);
   return device_ptr;
@@ -32,7 +32,7 @@ cl_mem alloc_shared_buffer_short (size_t size, cl_short **host_ptr) {
   cl_mem device_ptr = clCreateBuffer(space->context, CL_MEM_ALLOC_HOST_PTR, sizeof(cl_short) * size, NULL, &status);
   checkError(status, "Failed to create buffer");
   assert (host_ptr != NULL);
-  *host_ptr = (cl_short*) clEnqueueMapBuffer(space->queue, device_ptr, CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(cl_short) * size, 0, NULL, NULL, &status);
+  *host_ptr = (cl_short*) clEnqueueMapBuffer(space->queue[0], device_ptr, CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(cl_short) * size, 0, NULL, NULL, &status);
   checkError(status, "Failed to create shared pointer");
   assert (*host_ptr != NULL);
   return device_ptr;

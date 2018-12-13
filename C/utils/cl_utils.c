@@ -53,8 +53,10 @@ int init_cl(char* file_name){
     checkError(ret, "Failed create context");
 
     // Create a command queue
-    space->queue = clCreateCommandQueue(space->context, device_id, 0, &ret);
-    checkError(ret, "Failed create command queue");
+	for (int i=0; i<2; i++) {
+		space->queue[i] = clCreateCommandQueue(space->context, device_id, 0, &ret);
+		checkError(ret, "Failed create command queue");
+	}
 
     // Create a program from the kernel source
 	#ifndef FPGA_BUILD 
@@ -79,7 +81,7 @@ int init_cl(char* file_name){
 					sizeof(cl_short) * MAX_FM_SIZE, NULL, &ret);
 		checkError(ret, "Failed to create buffer");
 		assert (space->fm_fpga_buffers[i] != NULL);
-		space->fm_buffers[i] = (cl_short*) clEnqueueMapBuffer(space->queue, space->fm_fpga_buffers[i], 
+		space->fm_buffers[i] = (cl_short*) clEnqueueMapBuffer(space->queue[0], space->fm_fpga_buffers[i], 
 					CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(cl_short) * MAX_FM_SIZE, 0, NULL, NULL, &ret);
 		checkError(ret, "Failed to map shared memory");
 		assert (space->fm_buffers[i] != NULL);

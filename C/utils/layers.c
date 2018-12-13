@@ -2,6 +2,7 @@
 #include "utils.h"
 #include "cl_utils.h"
 #include "activations.h"
+#include "cl_space.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -34,12 +35,12 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, int first, cl_kernel* ker
     if(_kernel == kernels[1]){
         size_t global_size[2] = {(size_t) fm_in->fdim, (size_t) fm_in->fdim};
         size_t local_size[2] = {(size_t) TILE_SIZE, (size_t) TILE_SIZE};
-        ret = clEnqueueNDRangeKernel(space->queue, _kernel, 2, NULL,
+        ret = clEnqueueNDRangeKernel(space->queue[0], _kernel, 2, NULL,
                 global_size, local_size, 0, NULL, &event);
     }else{
         size_t global_size = (size_t) conv->size_out;
         size_t local_size = (size_t) 8;
-        ret = clEnqueueTask(space->queue, _kernel, 0, NULL, &event);
+        ret = clEnqueueTask(space->queue[0], _kernel, 0, NULL, &event);
         // ret = clEnqueueNDRangeKernel(space->queue, _kernel, 1, NULL,
         //         &global_size, &local_size, 0, NULL, &event);
     }
@@ -114,14 +115,26 @@ cl_short __div(cl_short x) {
 fm_t* divide(fm_t* fm_in){
     return apply_f(fm_in, __div);
 }
-fm_t* add(fm_t* fm_in1, fm_t* fm_in2){
+fm_t* add(fm_t* fm_in1, fm_t* fm_in2, cl_kernel kernel){
     assert(fm_in1->nchannels == fm_in2->nchannels);
     assert(fm_in1->fdim == fm_in2->fdim);
-    const int size = fm_in1->nchannels*fm_in1->fsize;
-    for(int i=0; i<size; ++i)
-        fm_in1->values[i] += fm_in2->values[i];
-    return fm_in1;
+    
+    fm_t * fm_out = alloc_fm(fm_in1->nchannels, fm_in1->fdim);
+    const int size = fm_in1->fsize*fm_in1->nchannels;
+    cl_int ret; cl_event event;
+    int _karg = 0;
+    ret = clSetKernelArg(kernel, _karg++, sizeof(int),    (void *)&(size));      checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(kernel, _karg++, sizeof(cl_mem), (void *)&(fm_in1->fpga_values));  checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(kernel, _karg++, sizeof(cl_mem), (void *)&(fm_in2->fpga_values)); checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(kernel, _karg++, sizeof(cl_mem), (void *)&(fm_out->fpga_values)); checkError(ret, "Failed to set args");
+    ret = clEnqueueTask(space->queue[1], kernel, 0, NULL, &event);
+    checkError(ret, "Failed enqueing kernel");
+    ret = clWaitForEvents(1, &event);
+    checkError(ret, "Failed waiting for events");
+    clReleaseEvent(event);
+    return fm_out;
 }
+
 fm_t* normalize(bn_t* bn, fm_t* fm_in, int first){
     assert(bn->size == fm_in->nchannels);
     cl_short* values = fm_in->values;

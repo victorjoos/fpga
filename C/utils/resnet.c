@@ -57,9 +57,9 @@ resnet_t* build_resnet(int nblocks, char* dir){
 double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
     cl_int ret;
     cl_kernel conv_kernels[2];
-    // load_kernel("pe_ff", &conv_kernels[0]);
     load_kernel("pe_tile_ff", &conv_kernels[1]);
-
+    cl_kernel add_kernel;
+    load_kernel("add", &add_kernel);
     int ok = 0;
     const int n_stacks=3;
     for(int imgi=0; imgi<n_imgs; ++imgi){
@@ -105,9 +105,10 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
                 }
 
                 // Addition with shortcut
-                fm = add(fm, fm_shortcut); free_fm(fm_shortcut);
-                fm = divide(fm);
-                fm = activate(fm, act_type);
+                fm_prev = fm;
+                fm = add(fm, fm_shortcut, add_kernel); 
+                free_fm(fm_shortcut); free_fm(fm_prev);
+
                 // Update shortcut value
                 fm_shortcut = fm;
                              

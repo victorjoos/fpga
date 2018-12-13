@@ -39,8 +39,10 @@ int main( int argc, char * argv[]){
     #else
     init_cl("pe_ff.aocx");
     #endif
+
     unsigned char* dataset = read_images("../datasets/test_batch.bin");
     resnet_t* resnet = build_resnet(3, "../test2/");
+
     int n = 100;
     start_timer(&timer);
     float acc = infer_resnet(resnet, dataset, n);
