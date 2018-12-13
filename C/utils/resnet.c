@@ -78,8 +78,8 @@ double infer_resnet(resnet_t* resnet, unsigned char* imgs, int n_imgs){
         fm = convolve(resnet->convs[0], resnet->bns[0], fm, 1, CL_TRUE, conv_kernels); free_fm(fm_prev);
         // fm = normalize(resnet->bns[0], fm, 1);
         // fm = activate(fm, act_type);
-        // print_fm(fm, 0, CL_TRUE);
-        // print_fm_sum(fm, CL_TRUE);
+        // print_fm(fm, 0, CL_FALSE);
+        // print_fm_sum(fm, CL_FALSE);
         // return 0;
         fm_t* fm_shortcut = fm;
 
