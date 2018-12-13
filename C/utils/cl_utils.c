@@ -42,11 +42,11 @@ int init_cl(char* file_name){
 	fseek(fp, 0, SEEK_END);
   	source_size = ftell(fp);
 	rewind(fp);
-	printf("source size according to tell: %d\n", source_size);
+	printf("source size according to tell: %d\n", (int) source_size);
     source_str = (unsigned char*)malloc(source_size);
     source_size = fread( source_str, 1, source_size, fp);
     fclose( fp );
-	printf("source size: %d\n", source_size);
+	printf("source size: %d\n", (int) source_size);
 
     // Create an OpenCL context
     space->context = clCreateContext( NULL, 1, &device_id, NULL, NULL, &ret);
@@ -104,16 +104,18 @@ int load_kernel(char* kernel_name,
 
 void free_cl(cl_kernel * kernels){
     for (int i=0; i<NMB_FM; ++i) {
-		clEnqueueUnmapMemObject (space->queue, space->fm_fpga_buffers[i], 
-					(void*)space->fm_buffers[i], 0, NULL, NULL);
 		clReleaseMemObject(space->fm_fpga_buffers[i]);
+		clEnqueueUnmapMemObject (space->queue[i], space->fm_fpga_buffers[i], 
+					(void*)space->fm_buffers[i], 0, NULL, NULL);
 	}
     cl_int ret;
-    ret = clFlush(space->queue);
-    ret = clFinish(space->queue);
+	for(int i=0; i<2; ++i){
+		ret = clFlush(space->queue[i]);
+		ret = clFinish(space->queue[i]);
+	}
     for(int i=1; i<2; ++i) clReleaseKernel(kernels[i]);
     ret = clReleaseProgram(space->program);
-    ret = clReleaseCommandQueue(space->queue);
+   for(int i=0; i<2; ++i) ret = clReleaseCommandQueue(space->queue[i]);
     ret = clReleaseContext(space->context);
 }
 

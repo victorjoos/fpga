@@ -43,7 +43,7 @@ int main( int argc, char * argv[]){
     unsigned char* dataset = read_images("../datasets/test_batch.bin");
     resnet_t* resnet = build_resnet(3, "../test2/");
 
-    int n = 100;
+    int n = 0;
     start_timer(&timer);
     float acc = infer_resnet(resnet, dataset, n);
     printf("%.4f accuracy on %d images\n", acc, n);

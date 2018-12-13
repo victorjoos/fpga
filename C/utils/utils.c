@@ -32,7 +32,7 @@ cl_mem alloc_shared_buffer_bn_vals (size_t size, bn_vals_t **host_ptr) {
   cl_mem device_ptr = clCreateBuffer(space->context, CL_MEM_ALLOC_HOST_PTR, sizeof(bn_vals_t) * size, NULL, &status);
   checkError(status, "Failed to create buffer");
   assert (host_ptr != NULL);
-  *host_ptr = (cl_short*) clEnqueueMapBuffer(space->queue[0], device_ptr, CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(cl_short) * size, 0, NULL, NULL, &status);
+  *host_ptr = (bn_vals_t*) clEnqueueMapBuffer(space->queue[0], device_ptr, CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(bn_vals_t) * size, 0, NULL, NULL, &status);
   checkError(status, "Failed to create shared pointer");
   assert (*host_ptr != NULL);
   return device_ptr;
@@ -248,13 +248,13 @@ void print_fm_sum(fm_t* fm, int fixed_point){
 
 void free_conv(conv_t* conv){
     // free(conv->kernel);
-    clEnqueueUnmapMemObject (space->queue, conv->fpga_kernel, conv->kernel, 0, NULL, NULL);
+    clEnqueueUnmapMemObject (space->queue[0], conv->fpga_kernel, conv->kernel, 0, NULL, NULL);
     clReleaseMemObject (conv->fpga_kernel);
     free(conv);
 }
 void free_dense(dense_t* dense){
     // free(dense->kernel);
-    clEnqueueUnmapMemObject (space->queue, dense->fpga_kernel, dense->kernel, 0, NULL, NULL);
+    clEnqueueUnmapMemObject (space->queue[0], dense->fpga_kernel, dense->kernel, 0, NULL, NULL);
     clReleaseMemObject (dense->fpga_kernel);
     free(dense);
 }
