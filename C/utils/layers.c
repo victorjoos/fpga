@@ -11,7 +11,7 @@
 
 
 
-fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, int first, cl_kernel* kernels){
+fm_t* convolve(conv_t* conv, bn_t* bn, fm_t* fm_in, int strides, int first, cl_kernel* kernels){
     assert(conv->size_in == fm_in->nchannels);
     fm_t* fm_out = alloc_fm(conv->size_out, fm_in->fdim/strides);
 
@@ -28,6 +28,7 @@ fm_t* convolve(conv_t* conv, fm_t* fm_in, int strides, int first, cl_kernel* ker
     ret = clSetKernelArg(_kernel, _karg++, sizeof(int),    (void *)&(fm_out->fdim));       checkError(ret, "Failed to set args");
     ret = clSetKernelArg(_kernel, _karg++, sizeof(cl_mem), (void *)&(conv->fpga_kernel));  checkError(ret, "Failed to set args");
     ret = clSetKernelArg(_kernel, _karg++, sizeof(cl_mem), (void *)&(fm_in->fpga_values)); checkError(ret, "Failed to set args");
+    ret = clSetKernelArg(_kernel, _karg++, sizeof(cl_mem), (void *)&(bn->fpga_values)); checkError(ret, "Failed to set args");
     ret = clSetKernelArg(_kernel, _karg++, sizeof(cl_mem), (void *)&(fm_out->fpga_values));checkError(ret, "Failed to set args");
 
     // Execute the OpenCL kernel
@@ -135,7 +136,7 @@ fm_t* add(fm_t* fm_in1, fm_t* fm_in2, cl_kernel kernel){
     return fm_out;
 }
 
-fm_t* normalize(bn_t* bn, fm_t* fm_in, int first){
+/*fm_t* normalize(bn_t* bn, fm_t* fm_in, int first){
     assert(bn->size == fm_in->nchannels);
     cl_short* values = fm_in->values;
     for(int n=0; n<fm_in->nchannels; ++n){
@@ -160,4 +161,4 @@ fm_t* normalize(bn_t* bn, fm_t* fm_in, int first){
         }
     }
     return fm_in;
-}
+}*/

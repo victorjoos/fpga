@@ -7,13 +7,19 @@
 #define MAX_KSIZE 3
 
 #define TILE_SIZE 4
-
+typedef struct bn_vals{
+    char gamma;
+    char gsign;
+    short beta;
+} bn_vals_t;
 __kernel void pe_tile_ff(const int first,
                 const int conv_size_in, const int conv_size_out,
                 const int ksize, const int strides, 
                 const int fdim_in, const int fdim_out,
                 __constant const uchar* restrict conv_kernel,
-                __constant short* restrict fm_in, __global short* restrict fm_out){
+                __constant short* restrict fm_in, 
+                __constant bn_vals_t* restrict bn_values,
+                __global short* restrict fm_out){
 
     // conv consts
     const int zsize = conv_size_out;
@@ -44,6 +50,15 @@ __kernel void pe_tile_ff(const int first,
     const int ii = TILE_SIZE*get_group_id(0) + 2*local_i - offset;
     const int jj = TILE_SIZE*get_group_id(1) + 2*local_j - offset;
     for(int outf=0; outf<conv_size_out; ++outf){
+        // Load bn values
+        struct bn_vals bv = bn_values[outf];
+        char gamma = bv.gamma;
+        char gsign = bv.gsign;
+        short beta = bv.beta;
+        uchar abs_gamma = (gamma<0)?-gamma:gamma;
+        bool is_gamma_neg = (gamma<0);
+
+        // Set variables for inner loop
         acc = 0;
         unsigned int sum_inf_fin = 0;
         unsigned int sum_inf_zsi = 0;
@@ -84,8 +99,29 @@ __kernel void pe_tile_ff(const int first,
             sum_inf_zsi += zsize;
         }
         if(should_save){
+            // Apply BN
+            short fm_elem = acc;
+            bool is_fe_neg = fm_elem<0;
+            ushort ufe = (is_fe_neg)?-fm_elem:fm_elem;
+            if(!first)  ufe = ufe << 8;
+            if(is_gamma_neg) ufe = ufe >> abs_gamma;
+            else             ufe = ufe << abs_gamma;
             
-            fm_out[outf*fsize_out + gbi + gbj] = acc;
+            fm_elem = ufe;
+            char fsign =(is_fe_neg)?1: 0;
+            if(fsign ^ gsign) fm_elem = -fm_elem;
+            fm_elem += beta;
+
+            // Activate
+            // printf("%d, ", fm_elem);
+            if(fm_elem<0){
+                if( fm_elem > -128) fm_elem =  0;
+                else         fm_elem = -1;
+            } else {
+                if( fm_elem > 128 ) fm_elem =  1;
+                else         fm_elem =  0;
+            }
+            fm_out[outf*fsize_out + gbi + gbj] = fm_elem;
         }
     }
 }
